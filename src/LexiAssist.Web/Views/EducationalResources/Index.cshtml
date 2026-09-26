@@ -1,0 +1,34 @@
+@model LexiAssist.Web.ViewModels.Resources.EducationalResourcesIndexViewModel
+@{
+    ViewData["Title"] = "Educational resources";
+}
+
+<div class="mb-4">
+    <p class="auth-eyebrow">LexiAssist resources</p>
+    <h1 class="h2">Educational resources</h1>
+    <p class="text-secondary mb-0">Practical reading and learning support you can explore at your own pace.</p>
+</div>
+
+@if (Model.Resources.Count == 0)
+{
+    <div class="empty-state">
+        <h2 class="h5">No resources are published yet</h2>
+        <p class="mb-0 text-secondary">Please check back later for new educational and support materials.</p>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+    @foreach (var resource in Model.Resources)
+    {
+        <div class="col-12 col-md-6 col-xl-4">
+            <article class="resource-preview h-100">
+                <p class="small text-secondary text-uppercase mb-2">@resource.ResourceType</p>
+                <h2 class="h5"><a asp-action="Details" asp-route-id="@resource.Id" class="text-decoration-none">@resource.Title</a></h2>
+                <p class="text-secondary mb-3">@resource.Summary</p>
+                <a asp-action="Details" asp-route-id="@resource.Id" class="btn btn-outline-primary btn-sm">Read resource</a>
+            </article>
+        </div>
+    }
+    </div>
+}

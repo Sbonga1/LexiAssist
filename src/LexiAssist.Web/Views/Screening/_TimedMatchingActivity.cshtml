@@ -1,0 +1,89 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningRunnerViewModel
+
+@if (Model.TimedMatchingItems.Count > 0 && Model.TimedMatchingReferenceMapping.Count > 0)
+{
+    <form asp-action="Respond" method="post" id="processing-speed-activity"
+          data-processing-speed-activity
+          data-time-limit-seconds="@Model.TimedMatchingTimeLimitSeconds">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="QuestionToken" value="@Model.QuestionToken" />
+        <input type="hidden" name="TimedOut" value="false" data-processing-speed-timeout />
+        <input type="hidden" name="TimedMatchingAnswersJson" value="[]" data-processing-speed-answers />
+
+        <p class="text-secondary">Use the reference mapping to choose the matching symbol for each item. Work at a comfortable pace; the timer only sets the activity window and is not a measure of intelligence or a diagnosis.</p>
+        <div class="border rounded p-3 mb-3" aria-labelledby="processing-speed-reference-heading">
+            <h3 id="processing-speed-reference-heading" class="h6">Reference mapping</h3>
+            <dl class="row mb-0">
+                @foreach (var pair in Model.TimedMatchingReferenceMapping)
+                {
+                    <dt class="col-6 col-sm-4">@pair.Key</dt>
+                    <dd class="col-6 col-sm-8">@pair.Value</dd>
+                }
+            </dl>
+        </div>
+
+        <p class="mb-2" role="timer" aria-live="polite" aria-atomic="true">
+            Time remaining: <span data-processing-speed-remaining>@Model.TimedMatchingTimeLimitSeconds</span> seconds
+        </p>
+        <p class="small text-secondary" role="status" aria-live="polite" data-processing-speed-status>
+            Item 1 of @Model.TimedMatchingItems.Count
+        </p>
+
+        <div class="screening-reading-stimulus mb-3" data-processing-speed-item aria-live="polite" tabindex="0"></div>
+
+        <fieldset class="mb-3" data-processing-speed-choices>
+            <legend class="form-label">Choose the matching symbol</legend>
+            <div class="d-grid gap-2 d-sm-flex flex-wrap" role="group" aria-label="Matching symbol choices">
+                @for (var index = 0; index < Model.AnswerChoices.Count; index++)
+                {
+                    var choice = Model.AnswerChoices[index];
+                    var choiceId = $"processing-speed-choice-{index}";
+                    <div>
+                        <input class="btn-check" type="radio" name="TimedMatchingCurrentAnswer" id="@choiceId" value="@choice" autocomplete="off" />
+                        <label class="btn btn-outline-primary btn-lg" for="@choiceId">@choice</label>
+                    </div>
+                }
+            </div>
+        </fieldset>
+
+        <button type="button" class="btn btn-primary" data-processing-speed-next disabled>Continue</button>
+        <button type="submit" class="visually-hidden" data-processing-speed-submit aria-hidden="true" tabindex="-1">Save activity</button>
+        <p class="small text-secondary mt-3 mb-0">Your answers are saved when the activity finishes. The saved summary is calculated by the server.</p>
+
+        <div data-processing-speed-item-list hidden aria-hidden="true">
+            @foreach (var item in Model.TimedMatchingItems)
+            {
+                <span data-processing-speed-item-value>@item</span>
+            }
+        </div>
+    </form>
+}
+else
+{
+    <form asp-action="Respond" method="post" id="timed-matching-activity"
+          data-timed-matching-activity
+          data-time-limit-seconds="@Model.TimedMatchingTimeLimitSeconds">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="QuestionToken" value="@Model.QuestionToken" />
+        <input type="hidden" name="TimedOut" value="false" data-timed-matching-timeout />
+
+        <p class="text-secondary">Choose the best match before the activity timer ends. Response time is recorded for this activity only and is not an intelligence measure or diagnosis.</p>
+        <p class="mb-3" role="timer" aria-live="polite" aria-atomic="true" data-timed-matching-timer>
+            Time remaining: <span data-timed-matching-remaining>@Model.TimedMatchingTimeLimitSeconds</span> seconds
+        </p>
+
+        <fieldset class="mb-3">
+            <legend class="form-label">Choose one answer</legend>
+            @for (var index = 0; index < Model.AnswerChoices.Count; index++)
+            {
+                var choice = Model.AnswerChoices[index];
+                var choiceId = $"timed-matching-choice-{index}";
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="SelectedAnswer" id="@choiceId" value="@choice" required />
+                    <label class="form-check-label" for="@choiceId">@choice</label>
+                </div>
+            }
+        </fieldset>
+        <button type="submit" class="btn btn-primary" data-timed-matching-submit>Save and continue</button>
+    </form>
+}

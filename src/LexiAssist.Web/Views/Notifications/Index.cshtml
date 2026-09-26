@@ -1,0 +1,155 @@
+@using LexiAssist.Web.Models.Notifications
+@using LexiAssist.Web.Services
+@model LexiAssist.Web.ViewModels.Notifications.NotificationListViewModel
+@{
+    ViewData["Title"] = "Notifications";
+
+    string BuildPageUrl(int page)
+    {
+        return $"/Notifications?page={page}";
+    }
+}
+
+<main class="notifications-page">
+    <header class="notifications-heading">
+        <p class="auth-eyebrow">Your account</p>
+        <h1>Notifications</h1>
+        <p class="notifications-intro">Updates about screening, referrals, and learning support.</p>
+    </header>
+
+    @if (Model.TotalItems == 0)
+    {
+        <section class="notifications-empty" aria-label="Notifications">
+            <strong>No notifications yet.</strong>
+            <p>Screening, referral, and learning-support updates will appear here.</p>
+        </section>
+    }
+    else
+    {
+        <section class="notifications-surface" aria-label="Notifications">
+            <div class="notifications-table-wrap">
+                <table class="notifications-table">
+                    <caption class="visually-hidden">Your notifications</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="notifications-col-notification">Notification</th>
+                            <th scope="col" class="notifications-col-received">Date received</th>
+                            <th scope="col" class="notifications-col-read">Date read</th>
+                            <th scope="col" class="notifications-col-action">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var notification in Model.Notifications)
+                    {
+                        var categoryClass = notification.Type switch
+                        {
+                            AppNotificationType.ScreeningCompleted => "is-screening",
+                            AppNotificationType.ReferralCreated or AppNotificationType.ReferralAssigned or AppNotificationType.ProfessionalFollowUpRequested => "is-referral",
+                            AppNotificationType.LearningActivityAssigned => "is-learning",
+                            _ => "is-neutral"
+                        };
+                        var icon = notification.Type switch
+                        {
+                            AppNotificationType.ScreeningCompleted => "▥",
+                            AppNotificationType.ReferralCreated or AppNotificationType.ReferralAssigned or AppNotificationType.ProfessionalFollowUpRequested => "↗",
+                            AppNotificationType.LearningActivityAssigned => "✦",
+                            _ => "•"
+                        };
+                        <tr class="notifications-row @(notification.ReadAtUtc is null ? "is-unread" : string.Empty)">
+                            <td class="notifications-main-cell" data-label="Notification">
+                                <div class="notifications-item">
+                                    <span class="notifications-icon @categoryClass" aria-hidden="true">@icon</span>
+                                    <div class="notifications-copy">
+                                        <div class="notifications-title-line">
+                                            <h2>@notification.Title</h2>
+                                            <span class="notifications-category @categoryClass">@Html.DisplayFor(_ => notification.Type)</span>
+                                            @if (notification.ReadAtUtc is null)
+                                            {
+                                                <span class="notifications-unread" title="Unread">
+                                                    <span class="notifications-unread-dot" aria-hidden="true"></span>
+                                                    <span class="visually-hidden">Unread</span>
+                                                </span>
+                                            }
+                                        </div>
+                                        <p>@notification.Message</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="notifications-date" data-label="Date received">
+                                <time datetime="@notification.CreatedAtUtc.ToString("O")">@SouthAfricaTimeFormatter.Format(notification.CreatedAtUtc)</time>
+                            </td>
+                            <td class="notifications-date" data-label="Date read">
+                                @if (notification.ReadAtUtc is { } readAtUtc)
+                                {
+                                    <time datetime="@readAtUtc.ToString("O")">@SouthAfricaTimeFormatter.Format(readAtUtc)</time>
+                                }
+                                else
+                                {
+                                    <span aria-label="Not read">—</span>
+                                }
+                            </td>
+                            <td class="notifications-action" data-label="Action">
+                                @if (notification.ReadAtUtc is not null && notification.RelatedUrl is not null)
+                                {
+                                    <a href="@notification.RelatedUrl" class="btn btn-sm btn-outline-primary">Open</a>
+                                }
+                                else if (notification.ReadAtUtc is null)
+                                {
+                                    <form asp-action="Open" asp-route-id="@notification.Id" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Open</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <footer class="notifications-table-footer">
+                <p class="notifications-summary">Showing @Model.FirstItemNumber–@Model.LastItemNumber of @Model.TotalItems notifications.</p>
+                @if (Model.TotalPages > 1)
+                {
+                    <nav aria-label="Notification pages">
+                        <ul class="pagination notifications-pagination mb-0">
+                            <li class="page-item @(!Model.HasPreviousPage ? "disabled" : string.Empty)">
+                                @if (Model.HasPreviousPage)
+                                {
+                                    <a class="page-link" href="@BuildPageUrl(Model.CurrentPage - 1)">Previous</a>
+                                }
+                                else
+                                {
+                                    <span class="page-link" aria-disabled="true">Previous</span>
+                                }
+                            </li>
+                            @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+                            {
+                                <li class="page-item @(pageNumber == Model.CurrentPage ? "active" : string.Empty)">
+                                    @if (pageNumber == Model.CurrentPage)
+                                    {
+                                        <span class="page-link" aria-current="page">@pageNumber</span>
+                                    }
+                                    else
+                                    {
+                                        <a class="page-link" href="@BuildPageUrl(pageNumber)">@pageNumber</a>
+                                    }
+                                </li>
+                            }
+                            <li class="page-item @(!Model.HasNextPage ? "disabled" : string.Empty)">
+                                @if (Model.HasNextPage)
+                                {
+                                    <a class="page-link" href="@BuildPageUrl(Model.CurrentPage + 1)">Next</a>
+                                }
+                                else
+                                {
+                                    <span class="page-link" aria-disabled="true">Next</span>
+                                }
+                            </li>
+                        </ul>
+                    </nav>
+                }
+            </footer>
+        </section>
+    }
+</main>

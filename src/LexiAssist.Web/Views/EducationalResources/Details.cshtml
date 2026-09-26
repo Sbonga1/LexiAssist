@@ -1,0 +1,18 @@
+@model LexiAssist.Web.ViewModels.Resources.EducationalResourceDetailsViewModel
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<article class="resource-detail">
+    <p class="auth-eyebrow">@Model.ResourceType</p>
+    <h1 class="h2">@Model.Title</h1>
+    <p class="lead text-secondary">@Model.Summary</p>
+    <div class="resource-content mt-4">@Model.Content</div>
+    @if (!string.IsNullOrWhiteSpace(Model.ExternalUrl))
+    {
+        <p class="mt-4 mb-0">
+            <a href="@Model.ExternalUrl" target="_blank" rel="noopener noreferrer">Open the related external resource</a>
+        </p>
+    }
+    <a asp-action="Index" class="btn btn-outline-secondary mt-4">Back to resources</a>
+</article>

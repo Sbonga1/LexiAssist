@@ -1,0 +1,124 @@
+@model LexiAssist.Web.ViewModels.Activities.SoundBuilderPlayViewModel
+@{
+    ViewData["Title"] = "Sound Builder";
+    var question = Model.CurrentQuestion;
+    var isBlend = question?.Mode == LexiAssist.Web.Models.Activities.SoundBuilderMode.Blend;
+}
+
+<section class="dashboard-page sound-builder-page" aria-labelledby="sound-builder-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Practice activity · Phonological awareness</p>
+        <h1 id="sound-builder-heading">Sound Builder</h1>
+        <p class="learner-dashboard-intro">Practise putting sound chunks together and breaking words into chunks. Take your time; each try is practice.</p>
+    </header>
+
+    @if (Model.AudioRecorder is { } audioRecorder)
+    {
+        <partial name="_LearnerAudioRecorder" model="audioRecorder" />
+    }
+
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="status">@errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Message))
+    {
+        <div class="alert alert-warning" role="status">@Model.Message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Feedback))
+    {
+        <div class="alert alert-info" role="status">@Model.Feedback</div>
+    }
+
+    @if (Model.IsCompleted)
+    {
+        <section class="admin-details-card" aria-labelledby="round-complete-heading">
+            <h2 id="round-complete-heading" class="h3">Practice round complete</h2>
+            <p>You completed @Model.TotalItems practice items and got @Model.CorrectItems right on this round.</p>
+            @if (Model.Accuracy is { } accuracy)
+            {
+                <p><strong>Accuracy:</strong> @accuracy.ToString("0.#")%</p>
+            }
+            @if (Model.DurationMilliseconds is { } duration)
+            {
+                <p><strong>Time spent:</strong> @TimeSpan.FromMilliseconds(duration).ToString(@"m\:ss")</p>
+            }
+            <p class="mb-3">Keep practising in short, comfortable sessions. This activity is for learning support.</p>
+            <a asp-action="Index" class="btn btn-outline-primary">Back to practice activities</a>
+        </section>
+    }
+    else if (Model.CanStart)
+    {
+        <section class="admin-details-card" aria-labelledby="ready-heading">
+            <h2 id="ready-heading" class="h3">Ready when you are</h2>
+            <p>This round has @Model.TotalItems short items. You will arrange the chunks using the buttons or by dragging them, then blend or segment each word.</p>
+            <p>It is fine to take your time. Sound Builder gives supportive practice feedback and does not make a diagnosis.</p>
+            <form asp-action="StartSoundBuilder" asp-route-assignmentId="@Model.AssignmentId" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Start practice</button>
+            </form>
+        </section>
+    }
+    else if (question is not null && Model.AttemptId is { } attemptId)
+    {
+        <section class="screening-question-panel" aria-labelledby="question-prompt">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                <p class="auth-eyebrow mb-0">Item @(Model.CompletedItems + 1) of @Model.TotalItems</p>
+                <progress class="screening-progress" value="@Model.CompletedItems" max="@Model.TotalItems" aria-label="Practice progress">@Model.CompletedItems of @Model.TotalItems</progress>
+            </div>
+            <h2 id="question-prompt" class="h3">@question.Prompt</h2>
+            @if (!isBlend)
+            {
+                <p class="sound-builder-target-word" aria-label="Word to segment">@question.Word</p>
+            }
+
+            <form asp-action="Answer" asp-route-assignmentId="@Model.AssignmentId" method="post" id="sound-builder-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="AttemptId" value="@attemptId" />
+                <input type="hidden" name="ItemId" value="@question.ItemId" />
+                <input type="hidden" id="ordered-chunk-indexes" name="OrderedChunkIndexes" value="@Model.OrderedChunkIndexes" />
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+                @if (isBlend)
+                {
+                    <p id="sound-builder-chunks-help" class="form-label">Sound chunks <span class="text-secondary">(drag to arrange, or use the move buttons)</span></p>
+                    <ol class="sound-builder-chunks" id="sound-builder-chunks" aria-label="Sound chunks in your answer order" aria-describedby="sound-builder-chunks-help">
+                    @foreach (var chunk in question.Chunks)
+                    {
+                        <li class="sound-builder-chunk" draggable="true" tabindex="0" data-index="@chunk.Index">
+                            <span class="sound-builder-chunk-text">@chunk.Text</span>
+                            <span class="sound-builder-chunk-actions">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-move="previous" aria-label="Move chunk @chunk.Text earlier">Move earlier</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-move="next" aria-label="Move chunk @chunk.Text later">Move later</button>
+                            </span>
+                        </li>
+                    }
+                    </ol>
+                    <p id="sound-builder-order-status" class="visually-hidden" role="status" aria-live="polite"></p>
+                    <div class="mb-3 mt-4">
+                        <label for="BlendedWord" class="form-label">Type the word you blended</label>
+                        <input id="BlendedWord" name="BlendedWord" value="@Model.BlendedWord" class="form-control" maxlength="100" autocomplete="off" required />
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-3 mt-4">
+                        <label for="SegmentedChunks" class="form-label">Separate the word into sound chunks</label>
+                        <input id="SegmentedChunks" name="SegmentedChunks" value="@Model.SegmentedChunks" class="form-control" maxlength="100" placeholder="For example: sh i p" autocomplete="off" required />
+                        <div class="form-text">Put a space between each sound chunk.</div>
+                    </div>
+                }
+                <button type="submit" class="btn btn-primary">Check and continue</button>
+            </form>
+        </section>
+    }
+    else
+    {
+        <p class="learner-empty-state">This practice assignment is not available right now. Please ask your support professional for help.</p>
+    }
+</section>
+
+@if (question is not null && !Model.IsCompleted && question.Mode == LexiAssist.Web.Models.Activities.SoundBuilderMode.Blend)
+{
+    <script src="~/js/sound-builder.js" asp-append-version="true" defer></script>
+}

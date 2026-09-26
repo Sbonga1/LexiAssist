@@ -1,0 +1,38 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningRunnerViewModel
+
+<form asp-action="Respond" method="post" id="pattern-reasoning-activity">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="QuestionToken" value="@Model.QuestionToken" />
+
+    <p class="text-secondary">Choose the option that best completes the pattern or relationship. This is an original educational activity and does not measure intelligence or provide a diagnosis.</p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+    {
+        <div class="mb-3 text-center">
+            <img src="@Model.ImagePath" class="img-fluid rounded border" alt="Visual pattern prompt" />
+        </div>
+    }
+
+    @if (Model.PatternDifficultyLevel is { } difficultyLevel)
+    {
+        <p class="small text-secondary">Activity level: @difficultyLevel of 5</p>
+    }
+
+    <fieldset class="mb-3">
+        <legend class="form-label">Choose one answer</legend>
+        <div class="d-grid gap-2" role="group" aria-label="Pattern answer choices">
+            @for (var index = 0; index < Model.AnswerChoices.Count; index++)
+            {
+                var choice = Model.AnswerChoices[index];
+                var choiceId = $"pattern-reasoning-choice-{index}";
+                <div>
+                    <input class="btn-check" type="radio" name="SelectedAnswer" id="@choiceId" value="@choice"
+                           required checked="@(string.Equals(ViewData.ModelState["SelectedAnswer"]?.AttemptedValue, choice, StringComparison.Ordinal) ? "checked" : null)" />
+                    <label class="btn btn-outline-primary btn-lg text-start w-100" for="@choiceId">@choice</label>
+                </div>
+            }
+        </div>
+    </fieldset>
+    <span asp-validation-for="SelectedAnswer" aria-live="polite" class="text-danger"></span>
+    <button type="submit" class="btn btn-primary btn-lg">Continue</button>
+</form>

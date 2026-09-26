@@ -1,0 +1,17 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Page not found";
+}
+
+<section class="auth-page" aria-labelledby="not-found-heading">
+    <div class="auth-card text-center">
+        <img class="brand-logo auth-logo" src="~/images/branding/lexiassist-logo.png" alt="LexiAssist" />
+        <h1 id="not-found-heading" class="auth-title">Page not found</h1>
+        <p class="auth-intro">We could not find the page you requested. Check the address or return to the home page.</p>
+        @if (Model?.ShowRequestId == true)
+        {
+            <p class="small text-muted" role="status">Reference: <code>@Model.RequestId</code></p>
+        }
+        <a asp-controller="Home" asp-action="Index" class="btn btn-primary">Return to home</a>
+    </div>
+</section>

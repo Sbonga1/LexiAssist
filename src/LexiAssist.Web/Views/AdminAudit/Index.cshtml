@@ -1,0 +1,144 @@
+@using System.Globalization
+@using LexiAssist.Web.Services
+@model LexiAssist.Web.ViewModels.AdminAudit.AdminAuditIndexViewModel
+@{
+    ViewData["Title"] = "Audit log";
+    var actionQuery = Uri.EscapeDataString(Model.ActionFilter ?? string.Empty);
+    var entityTypeQuery = Uri.EscapeDataString(Model.EntityTypeFilter ?? string.Empty);
+    var succeededQuery = Model.SucceededFilter?.ToString().ToLowerInvariant() ?? string.Empty;
+}
+
+<section class="admin-audit-page" aria-labelledby="audit-heading">
+    <header class="admin-audit-heading">
+        <p class="auth-eyebrow">Administration</p>
+        <h1 id="audit-heading">Audit log</h1>
+        <p class="admin-audit-intro">Security-sensitive actions recorded by LexiAssist. Details contain limited safe metadata and never raw request bodies.</p>
+    </header>
+
+    <form method="get" class="admin-audit-filter-surface" aria-label="Filter audit events">
+        <div class="admin-audit-filter-field">
+            <label class="form-label" for="action-filter">Action</label>
+            <input id="action-filter" class="form-control" name="action" value="@Model.ActionFilter" maxlength="120" placeholder="e.g. Referral.Assigned" />
+        </div>
+        <div class="admin-audit-filter-field">
+            <label class="form-label" for="entity-filter">Entity type</label>
+            <input id="entity-filter" class="form-control" name="entityType" value="@Model.EntityTypeFilter" maxlength="120" placeholder="e.g. User" />
+        </div>
+        <div class="admin-audit-filter-field">
+            <label class="form-label" for="outcome-filter">Outcome</label>
+            <select id="outcome-filter" class="form-select" name="succeeded">
+                <option value="" selected="@(!Model.SucceededFilter.HasValue ? "selected" : null)">All outcomes</option>
+                <option value="true" selected="@(Model.SucceededFilter == true ? "selected" : null)">Successful</option>
+                <option value="false" selected="@(Model.SucceededFilter == false ? "selected" : null)">Failed</option>
+            </select>
+        </div>
+        <div class="admin-audit-filter-actions">
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Clear</a>
+        </div>
+    </form>
+
+    @if (Model.Events.Count == 0)
+    {
+        <div class="admin-audit-empty" role="status">
+            <strong>No audit events found</strong>
+            <span>No audit events match the selected filters.</span>
+        </div>
+    }
+    else
+    {
+        <div class="admin-audit-table-surface">
+            <div class="admin-audit-table-wrap">
+            <table class="table admin-audit-table mb-0">
+                <caption class="visually-hidden">Audit events</caption>
+                <colgroup>
+                    <col class="admin-audit-col-date" />
+                    <col class="admin-audit-col-actor" />
+                    <col class="admin-audit-col-action" />
+                    <col class="admin-audit-col-entity" />
+                    <col class="admin-audit-col-outcome" />
+                    <col class="admin-audit-col-metadata" />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Actor</th>
+                        <th scope="col">Action</th>
+                        <th scope="col">Entity</th>
+                        <th scope="col">Outcome</th>
+                        <th scope="col">Safe metadata</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var audit in Model.Events)
+                {
+                    var catDate = SouthAfricaTimeFormatter.Format(audit.OccurredAtUtc);
+                    var dateParts = catDate.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+                    var datePart = dateParts.ElementAtOrDefault(0) ?? "—";
+                    var timePart = dateParts.Length > 1 ? string.Join(' ', dateParts.Skip(1)) : string.Empty;
+                    <tr class="admin-audit-event-row">
+                        <td>
+                            <time class="admin-audit-date-time" datetime="@audit.OccurredAtUtc.ToString("O", CultureInfo.InvariantCulture)">
+                                <span>@datePart</span>
+                                <span>@timePart</span>
+                            </time>
+                        </td>
+                        <td class="admin-audit-actor">@audit.ActorName</td>
+                        <td><code class="admin-audit-action">@audit.Action</code></td>
+                        <td class="admin-audit-entity">@audit.EntityType@(string.IsNullOrWhiteSpace(audit.EntityId) ? string.Empty : $" #{audit.EntityId}")</td>
+                        <td>
+                            <span class="admin-audit-outcome @(audit.Succeeded ? "is-success" : "is-failure")">
+                                <span class="admin-audit-outcome-dot" aria-hidden="true"></span>
+                                <span>@(audit.Succeeded ? "Successful" : "Failed")</span>
+                            </span>
+                        </td>
+                        <td><code class="admin-audit-metadata">@(string.IsNullOrWhiteSpace(audit.DetailsJson) ? "—" : audit.DetailsJson)</code></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            </div>
+
+            <div class="admin-audit-table-footer">
+                <p class="admin-audit-summary">Showing @Model.FirstItemNumber–@Model.LastItemNumber of @Model.TotalCount audit events</p>
+                <nav aria-label="Audit log pages">
+                    <ul class="pagination admin-audit-pagination mb-0">
+                        <li class="page-item @(!Model.HasPreviousPage ? "disabled" : string.Empty)">
+                            @if (Model.HasPreviousPage)
+                            {
+                                <a class="page-link" href="?action=@actionQuery&amp;entityType=@entityTypeQuery&amp;succeeded=@succeededQuery&amp;page=@(Model.PageNumber - 1)">Previous</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Previous</span>
+                            }
+                        </li>
+                        @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+                        {
+                            <li class="page-item @(pageNumber == Model.PageNumber ? "active" : string.Empty)">
+                                @if (pageNumber == Model.PageNumber)
+                                {
+                                    <span class="page-link" aria-current="page">@pageNumber</span>
+                                }
+                                else
+                                {
+                                    <a class="page-link" href="?action=@actionQuery&amp;entityType=@entityTypeQuery&amp;succeeded=@succeededQuery&amp;page=@pageNumber">@pageNumber</a>
+                                }
+                            </li>
+                        }
+                        <li class="page-item @(!Model.HasNextPage ? "disabled" : string.Empty)">
+                            @if (Model.HasNextPage)
+                            {
+                                <a class="page-link" href="?action=@actionQuery&amp;entityType=@entityTypeQuery&amp;succeeded=@succeededQuery&amp;page=@(Model.PageNumber + 1)">Next</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Next</span>
+                            }
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    }
+</section>

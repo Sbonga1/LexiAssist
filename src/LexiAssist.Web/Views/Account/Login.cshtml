@@ -1,0 +1,85 @@
+@model LexiAssist.Web.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = "Sign in";
+}
+
+<section class="auth-page auth-login-page" aria-labelledby="login-heading">
+    <div class="auth-login-layout">
+        <section class="auth-login-intro" aria-labelledby="login-support-heading">
+            <div class="auth-login-copy">
+                <p class="auth-login-eyebrow">A learning space that listens</p>
+                <h2 id="login-support-heading">Helping every learner find their <span>next confident step.</span></h2>
+                <p class="auth-login-lede">LexiAssist brings screening, focused practice, progress, and professional support together in one welcoming place.</p>
+
+                <div class="auth-feature-list" aria-label="LexiAssist support areas">
+                    <div class="auth-feature">
+                        <span class="auth-feature-icon auth-feature-icon-screening" aria-hidden="true">&#10003;</span>
+                        <span><strong>Screening</strong><small>Clearer next steps</small></span>
+                    </div>
+                    <div class="auth-feature">
+                        <span class="auth-feature-icon auth-feature-icon-practice" aria-hidden="true">&#9733;</span>
+                        <span><strong>Practice</strong><small>Small wins, every day</small></span>
+                    </div>
+                    <div class="auth-feature">
+                        <span class="auth-feature-icon auth-feature-icon-progress" aria-hidden="true">&#9646;&#9646;&#9646;</span>
+                        <span><strong>Progress</strong><small>Built around you</small></span>
+                    </div>
+                    <div class="auth-feature">
+                        <span class="auth-feature-icon auth-feature-icon-support" aria-hidden="true">&#9733;</span>
+                        <span><strong>Support</strong><small>A stronger learning journey</small></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-login-visual" aria-label="Learner surrounded by learning support">
+                <div class="auth-login-visual-orbit" aria-hidden="true"></div>
+                <img src="~/assets/skilline/girl.png" alt="Smiling learner holding colourful books" />
+            </div>
+        </section>
+
+        <div class="auth-login-panel">
+            <div class="auth-card auth-login-card">
+                <img class="brand-logo auth-logo" src="~/images/branding/lexiassist-logo.png" alt="LexiAssist" />
+                <h1 id="login-heading" class="auth-title">Welcome back</h1>
+                <p class="auth-intro">Sign in to continue to your workspace.</p>
+
+                @if (TempData["StatusMessage"] is string statusMessage)
+                {
+                    <div class="alert alert-success" role="status">@statusMessage</div>
+                }
+
+                <form asp-controller="Account" asp-action="Login" method="post" class="auth-form">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control form-control-lg" autocomplete="username" autofocus />
+                        <span asp-validation-for="Email" aria-live="polite" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Password" class="form-label"></label>
+                        <input asp-for="Password" class="form-control form-control-lg" autocomplete="current-password" />
+                        <span asp-validation-for="Password" aria-live="polite" class="text-danger small"></span>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input asp-for="RememberMe" class="form-check-input" />
+                        <label asp-for="RememberMe" class="form-check-label"></label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg w-100">Sign in</button>
+                </form>
+
+                <p class="auth-footnote">If you need help accessing your account, contact your LexiAssist administrator.</p>
+                <p class="auth-footnote mt-2">New to LexiAssist? <a asp-controller="Account" asp-action="Register">Create a learner account</a></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

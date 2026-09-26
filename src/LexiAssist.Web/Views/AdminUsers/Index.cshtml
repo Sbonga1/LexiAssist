@@ -1,0 +1,164 @@
+@model LexiAssist.Web.ViewModels.AdminUsers.AdminUsersIndexViewModel
+@using LexiAssist.Web.Models.Identity
+@{
+    ViewData["Title"] = "Manage users";
+}
+
+<section class="admin-users-page" aria-labelledby="admin-users-heading">
+    <header class="admin-users-heading">
+        <div>
+            <p class="auth-eyebrow">Administration</p>
+            <h1 id="admin-users-heading">User accounts</h1>
+            <p class="admin-users-intro">View and manage all LexiAssist user accounts across learners, psychologists, and administrators.</p>
+        </div>
+        <a asp-action="Create" class="admin-users-create">
+            <span aria-hidden="true">+</span>
+            <span>Create user</span>
+        </a>
+    </header>
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+
+    <form asp-action="Index" method="get" class="admin-users-filter-surface">
+        <div class="admin-users-search">
+            <label for="search">Search users</label>
+            <div class="admin-users-search-control">
+                <span class="admin-users-search-icon" aria-hidden="true">⌕</span>
+                <input id="search" name="search" value="@Model.SearchTerm" class="form-control" placeholder="Search by name or email..." />
+            </div>
+        </div>
+        <button type="submit" class="admin-users-search-button">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+        {
+            <a asp-action="Index" class="admin-users-clear">Clear</a>
+        }
+    </form>
+
+    <section class="admin-users-table-surface" aria-labelledby="admin-users-table-heading">
+        <h2 id="admin-users-table-heading" class="visually-hidden">LexiAssist user accounts</h2>
+        <div class="admin-users-table-wrap">
+            <table class="table align-middle mb-0 admin-users-table">
+                <caption class="visually-hidden">LexiAssist user accounts</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Users.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5">
+                            <div class="admin-users-empty" role="status">
+                                <span class="admin-users-empty-icon" aria-hidden="true">⌕</span>
+                                <strong>No users match your current search.</strong>
+                                @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+                                {
+                                    <a asp-action="Index">Clear search</a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var user in Model.Users)
+                    {
+                        var displayName = $"{user.FirstName} {user.LastName}".Trim();
+                        if (string.IsNullOrWhiteSpace(displayName))
+                        {
+                            displayName = string.IsNullOrWhiteSpace(user.PreferredName) ? user.Email : user.PreferredName;
+                        }
+
+                        var initials = string.Concat(new[] { user.FirstName, user.LastName }
+                            .Where(value => !string.IsNullOrWhiteSpace(value))
+                            .Select(value => value.Trim()[0]))
+                            .ToUpperInvariant();
+                        if (string.IsNullOrWhiteSpace(initials))
+                        {
+                            initials = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                .Where(value => value.Length > 0)
+                                .Take(2)
+                                .Select(value => value[0])
+                                .ToArray() is { Length: > 0 } fallbackInitials
+                                ? new string(fallbackInitials).ToUpperInvariant()
+                                : "?";
+                        }
+
+                        var roleLabel = string.IsNullOrWhiteSpace(user.Roles) ? "No role" : user.Roles;
+                        var roleClass = user.Roles.Contains(ApplicationRoles.Administrator, StringComparison.OrdinalIgnoreCase)
+                            ? "admin-users-role-administrator"
+                            : user.Roles.Contains(ApplicationRoles.Psychologist, StringComparison.OrdinalIgnoreCase)
+                                ? "admin-users-role-psychologist"
+                                : user.Roles.Contains(ApplicationRoles.Learner, StringComparison.OrdinalIgnoreCase)
+                                    ? "admin-users-role-learner"
+                                    : "admin-users-role-neutral";
+
+                        <tr>
+                            <th scope="row">
+                                <div class="admin-users-name-cell">
+                                    <span class="admin-users-avatar" aria-hidden="true">@initials</span>
+                                    <span>
+                                        <strong>@displayName</strong>
+                                        @if (!string.IsNullOrWhiteSpace(user.PreferredName) && !string.Equals(user.PreferredName, displayName, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <small>@user.PreferredName</small>
+                                        }
+                                    </span>
+                                </div>
+                            </th>
+                            <td class="admin-users-email">@user.Email</td>
+                            <td><span class="admin-users-role-badge @roleClass">@roleLabel</span></td>
+                            <td>
+                                <span class="admin-users-status-badge @(user.IsActive ? "admin-users-status-active" : "admin-users-status-inactive")">
+                                    <span class="admin-users-status-dot" aria-hidden="true"></span>
+                                    @(user.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@user.Id" class="admin-users-view">View</a>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="admin-users-table-footer">
+            <span class="admin-users-count">@Model.TotalCount user(s)</span>
+            <nav aria-label="User list pages">
+                <ul class="pagination admin-users-pagination mb-0">
+                    <li class="page-item @(!Model.HasPreviousPage ? "disabled" : "")">
+                        @if (Model.HasPreviousPage)
+                        {
+                            <a class="page-link" asp-action="Index" asp-route-search="@Model.SearchTerm" asp-route-page="@(Model.PageNumber - 1)" aria-label="Previous page">‹</a>
+                        }
+                        else
+                        {
+                            <span class="page-link" aria-disabled="true" aria-label="Previous page">‹</span>
+                        }
+                    </li>
+                    <li class="page-item active" aria-current="page"><span class="page-link">@Model.PageNumber</span></li>
+                    <li class="page-item @(!Model.HasNextPage ? "disabled" : "")">
+                        @if (Model.HasNextPage)
+                        {
+                            <a class="page-link" asp-action="Index" asp-route-search="@Model.SearchTerm" asp-route-page="@(Model.PageNumber + 1)" aria-label="Next page">›</a>
+                        }
+                        else
+                        {
+                            <span class="page-link" aria-disabled="true" aria-label="Next page">›</span>
+                        }
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </section>
+</section>

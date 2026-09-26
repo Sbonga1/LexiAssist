@@ -1,0 +1,36 @@
+@model LexiAssist.Web.ViewModels.Recordings.LearnerAudioRecorderViewModel
+
+<section class="admin-details-card mb-4 learner-audio-recorder"
+         aria-labelledby="audio-recording-heading"
+         data-learner-audio-recorder
+         data-start-url="@Model.StartUrl"
+         data-recordings-url="@Model.ExistingRecordingsUrl"
+         data-max-duration-seconds="@Model.MaxDurationSeconds">
+    <h2 id="audio-recording-heading" class="h5">Optional voice recording</h2>
+    @if (Model.CanRecord)
+    {
+        <p class="mb-2">You may record a spoken response for this activity. The recording is saved privately with your work and can be played by you and appropriately authorized staff. It is not automatically transcribed or used to make a diagnosis.</p>
+        <p class="text-secondary">Recordings stop after @Model.MaxDurationSeconds seconds. You can also stop sooner.</p>
+        <form data-audio-recording-consent-form>
+            @Html.AntiForgeryToken()
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="audio-recording-consent" data-audio-recording-consent />
+                <label class="form-check-label" for="audio-recording-consent">I understand and consent to recording and saving my voice for this activity.</label>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-primary" data-audio-recording-start>Start recording</button>
+                <button type="button" class="btn btn-outline-secondary" data-audio-recording-stop disabled>Stop and save</button>
+            </div>
+            <p class="mt-3 mb-2" role="status" aria-live="polite" data-audio-recording-status></p>
+            <h3 id="saved-recordings-heading" class="h6 mt-3 mb-2">Saved recordings</h3>
+            <div data-audio-recording-playback role="region" aria-labelledby="saved-recordings-heading" aria-live="polite"></div>
+        </form>
+    }
+    else
+    {
+        <p class="text-secondary">This activity is complete. Your saved recordings are available here for playback.</p>
+        <h3 id="saved-recordings-heading" class="h6 mt-3 mb-2">Saved recordings</h3>
+        <div data-audio-recording-playback role="region" aria-labelledby="saved-recordings-heading" aria-live="polite"></div>
+    }
+</section>
+<script src="~/js/learner-audio-recorder.js" asp-append-version="true" defer></script>

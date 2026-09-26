@@ -1,0 +1,130 @@
+@model LexiAssist.Web.ViewModels.Activities.SayWriteMatchPlayViewModel
+@{
+    ViewData["Title"] = "Say-Write-Match";
+    var question = Model.CurrentQuestion;
+}
+
+<section class="dashboard-page say-write-match-page" aria-labelledby="say-write-match-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Practice activity · Spelling</p>
+        <h1 id="say-write-match-heading">Say-Write-Match</h1>
+        <p class="learner-dashboard-intro">Listen to the pronunciation when audio is available, read the clue, and arrange the letter chunks to build the word. Take your time.</p>
+    </header>
+
+    @if (Model.AudioRecorder is { } audioRecorder)
+    {
+        <partial name="_LearnerAudioRecorder" model="audioRecorder" />
+    }
+
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="status">@errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Message))
+    {
+        <div class="alert alert-warning" role="status">@Model.Message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Feedback))
+    {
+        <div class="alert alert-info" role="status">@Model.Feedback</div>
+    }
+
+    @if (Model.IsCompleted)
+    {
+        <section class="admin-details-card" aria-labelledby="say-write-match-complete-heading">
+            <h2 id="say-write-match-complete-heading" class="h3">Practice round complete</h2>
+            <p>You worked through all @Model.TotalItems words. Every try is a chance to practise.</p>
+            <dl class="fast-name-race-results">
+                <div><dt>Words matched</dt><dd>@Model.CorrectCount of @Model.ResponsesCount</dd></div>
+                <div><dt>Practice accuracy</dt><dd>@(Model.Accuracy?.ToString("0.#") ?? "—")%</dd></div>
+                <div><dt>Words practised</dt><dd>@Model.ItemsCompleted</dd></div>
+                @if (Model.DurationMilliseconds is { } duration)
+                {
+                    <div><dt>Time in this activity</dt><dd>@TimeSpan.FromMilliseconds(duration).ToString(@"m\:ss")</dd></div>
+                }
+            </dl>
+            <a asp-action="Index" class="btn btn-outline-primary">Back to practice activities</a>
+        </section>
+    }
+    else if (Model.CanStart)
+    {
+        <section class="admin-details-card" aria-labelledby="say-write-match-ready-heading">
+            <h2 id="say-write-match-ready-heading" class="h3">Ready when you are</h2>
+            <p>This round has @Model.TotalItems words. Listen when pronunciation audio is available, then use the clue and chunks to build each word.</p>
+            <p>Audio is optional. You can complete the activity using the visible clues and letter chunks.</p>
+            <form asp-action="StartSayWriteMatch" asp-route-assignmentId="@Model.AssignmentId" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Start practice</button>
+            </form>
+        </section>
+    }
+    else if (question is not null && Model.AttemptId is { } attemptId)
+    {
+        <section class="screening-question-panel say-write-match-panel" aria-labelledby="say-write-match-prompt">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                <p class="auth-eyebrow mb-0">Word @(Model.ItemsCompleted + 1) of @Model.TotalItems</p>
+                <progress class="screening-progress" value="@Model.ItemsCompleted" max="@Model.TotalItems" aria-label="Practice progress">@Model.ItemsCompleted of @Model.TotalItems</progress>
+            </div>
+
+            <h2 id="say-write-match-prompt" class="h3">Build the word from its chunks</h2>
+            @if (question.AudioPath is not null)
+            {
+                <div class="say-write-match-audio">
+                    <label for="say-write-match-audio-player" class="form-label">Optional pronunciation</label>
+                    <audio id="say-write-match-audio-player" controls preload="none" aria-label="Optional pronunciation audio" aria-describedby="say-write-match-audio-error">
+                        <source src="@question.AudioPath" />
+                        Your browser cannot play this audio. Use the clue and chunks to continue.
+                    </audio>
+                    <p id="say-write-match-audio-error" class="form-text" role="status" hidden>Audio playback is unavailable for this item. You can continue with the clue and chunks.</p>
+                </div>
+            }
+            else if (question.AudioUnavailable)
+            {
+                <p class="alert alert-warning" role="status">Audio playback is unavailable for this item. You can continue with the clue and chunks.</p>
+            }
+            else
+            {
+                <p class="form-text">No audio is needed for this item. Use the clue and chunks below.</p>
+            }
+
+            <p class="say-write-match-prompt">@question.Prompt</p>
+
+            <form asp-action="AnswerSayWriteMatch" asp-route-assignmentId="@Model.AssignmentId" method="post" id="say-write-match-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="AttemptId" value="@attemptId" />
+                <input type="hidden" name="ItemId" value="@question.ItemId" />
+                <input type="hidden" name="SubmissionId" value="@Model.SubmissionId" />
+                <input type="hidden" id="ordered-say-write-match-indexes" name="OrderedChunkIndexes" value="@Model.OrderedChunkIndexes" />
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+                <p id="say-write-match-chunks-help" class="form-label">Letter and spelling chunks <span class="text-secondary">(drag to arrange, or use the move buttons)</span></p>
+                <ol class="say-write-match-chunks" id="say-write-match-chunks" aria-label="Chunks in your answer order" aria-describedby="say-write-match-chunks-help">
+                @foreach (var chunk in question.Chunks)
+                {
+                    <li class="say-write-match-chunk" draggable="true" tabindex="0" data-index="@chunk.Index">
+                        <span class="say-write-match-chunk-text">@chunk.Text</span>
+                        <span class="say-write-match-chunk-actions">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-move="previous" aria-label="Move chunk @chunk.Text earlier">Move earlier</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-move="next" aria-label="Move chunk @chunk.Text later">Move later</button>
+                        </span>
+                    </li>
+                }
+                </ol>
+                <p id="say-write-match-order-status" class="visually-hidden" role="status" aria-live="polite"></p>
+
+                <button type="submit" class="btn btn-primary mt-4">Check and continue</button>
+            </form>
+        </section>
+    }
+    else
+    {
+        <p class="learner-empty-state">This practice assignment is not available right now. Please ask your support professional for help.</p>
+    }
+
+    <p class="mt-4"><a asp-action="Index">Return to practice activities</a></p>
+</section>
+
+@if (question is not null && !Model.IsCompleted)
+{
+    <script src="~/js/say-write-match.js" asp-append-version="true" defer></script>
+}

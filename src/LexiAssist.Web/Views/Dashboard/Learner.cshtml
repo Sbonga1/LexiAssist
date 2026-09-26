@@ -1,0 +1,73 @@
+@model LexiAssist.Web.ViewModels.LearnerDashboardViewModel
+@{
+    ViewData["Title"] = "Learner dashboard";
+}
+
+<section class="dashboard-page" aria-labelledby="dashboard-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Learner workspace</p>
+        <h1 id="dashboard-heading">Learner dashboard</h1>
+        <p class="learner-dashboard-intro">Your screening, practice, progress, and learning resources will be gathered here.</p>
+    </header>
+
+    <div class="learner-dashboard-grid">
+        <section id="screening" class="learner-dashboard-section" aria-labelledby="screening-heading">
+            <h2 id="screening-heading">Start or continue screening</h2>
+            <p class="learner-empty-state">Review the active categories and start or resume your educational screening.</p>
+            <a asp-controller="Screening" asp-action="Index" class="btn btn-outline-primary mt-3">Open screening</a>
+        </section>
+
+        <section id="screening-result" class="learner-dashboard-section" aria-labelledby="screening-result-heading">
+            <h2 id="screening-result-heading">Most recent screening result</h2>
+            @if (Model.MostRecentScreeningResult is { } latestResult)
+            {
+                <p class="learner-dashboard-intro">Completed @latestResult.CompletedAtUtc.ToString("D").</p>
+                <a asp-controller="Screening" asp-action="Results" asp-route-attemptId="@latestResult.AttemptId" class="btn btn-outline-primary mt-3">View screening result</a>
+            }
+            else
+            {
+                <p class="learner-empty-state">Your most recent screening result will appear here when available.</p>
+            }
+        </section>
+
+        <section id="practice" class="learner-dashboard-section" aria-labelledby="practice-heading">
+            <h2 id="practice-heading">Assigned learning activities</h2>
+            <p class="learner-empty-state">Open your practice space to view assigned learning activities and saved practice progress.</p>
+            <a asp-controller="Activities" asp-action="Index" class="btn btn-outline-primary mt-3">Open practice activities</a>
+        </section>
+
+        <section id="progress" class="learner-dashboard-section" aria-labelledby="progress-heading">
+            <h2 id="progress-heading">Recent progress</h2>
+            <p class="learner-empty-state">Review your recorded screening history, practice activity, accuracy, and target skill areas.</p>
+            <a asp-controller="Progress" asp-action="Index" class="btn btn-outline-primary mt-3">Open learner progress</a>
+        </section>
+
+        <section id="resources" class="learner-dashboard-section" aria-labelledby="resources-heading">
+            <h2 id="resources-heading">Educational resources</h2>
+            <p class="learner-empty-state">Published educational and support materials are available at your own pace.</p>
+            <a asp-controller="EducationalResources" asp-action="Index" class="btn btn-outline-primary btn-sm">Browse resources</a>
+        </section>
+
+        <section id="daily-practice" class="learner-dashboard-section" aria-labelledby="daily-practice-heading">
+            <h2 id="daily-practice-heading">Today's practice <span class="visually-hidden">Daily practice reminder</span></h2>
+            @if (Model.TodayPractice.TargetReached)
+            {
+                <p class="learner-dashboard-intro">You have logged @Model.TodayPractice.CompletedMinutes minutes today and reached your @Model.TodayPractice.TargetMinutes-minute target.</p>
+            }
+            else
+            {
+                <p class="learner-dashboard-intro">You have logged @Model.TodayPractice.CompletedMinutes of @Model.TodayPractice.TargetMinutes minutes today. @Model.TodayPractice.RemainingMinutes minutes remain in your target.</p>
+            }
+            <progress class="screening-progress w-100" value="@Math.Min(Model.TodayPractice.CompletedMinutes, Model.TodayPractice.TargetMinutes)" max="@Model.TodayPractice.TargetMinutes" aria-label="Today's practice progress">@Model.TodayPractice.CompletedMinutes of @Model.TodayPractice.TargetMinutes minutes</progress>
+            @if (Model.TodayPractice.RemindersEnabled)
+            {
+                <p class="form-text mt-3">In-app reminders are on for @Model.TodayPractice.PreferredReminderTime.ToString("HH:mm").</p>
+            }
+            else
+            {
+                <p class="form-text mt-3">In-app reminders are off. You can turn them on in Settings.</p>
+            }
+            <a asp-controller="Settings" asp-action="Accessibility" class="btn btn-outline-primary mt-2">Practice reminder settings</a>
+        </section>
+    </div>
+</section>

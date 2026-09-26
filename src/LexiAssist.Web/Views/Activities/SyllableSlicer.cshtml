@@ -1,0 +1,111 @@
+@model LexiAssist.Web.ViewModels.Activities.SyllableSlicerPlayViewModel
+@{
+    ViewData["Title"] = "Syllable Slicer";
+    var question = Model.CurrentQuestion;
+}
+
+<section class="dashboard-page syllable-slicer-page" aria-labelledby="syllable-slicer-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Practice activity · Word reading</p>
+        <h1 id="syllable-slicer-heading">Syllable Slicer</h1>
+        <p class="learner-dashboard-intro">Look at the word, then arrange its syllable chunks in order. Take your time and use the move buttons or drag the chunks.</p>
+    </header>
+
+    @if (Model.AudioRecorder is { } audioRecorder)
+    {
+        <partial name="_LearnerAudioRecorder" model="audioRecorder" />
+    }
+
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="status">@errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Message))
+    {
+        <div class="alert alert-warning" role="status">@Model.Message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Feedback))
+    {
+        <div class="alert alert-info" role="status">@Model.Feedback</div>
+    }
+
+    @if (Model.IsCompleted)
+    {
+        <section class="admin-details-card" aria-labelledby="syllable-slicer-complete-heading">
+            <h2 id="syllable-slicer-complete-heading" class="h3">Practice round complete</h2>
+            <p>You arranged all @Model.TotalItems words. Every try is part of learning.</p>
+            <dl class="fast-name-race-results">
+                <div><dt>Words in order</dt><dd>@Model.CorrectCount of @Model.AttemptsCount</dd></div>
+                <div><dt>Practice accuracy</dt><dd>@(Model.Accuracy?.ToString("0.#") ?? "—")%</dd></div>
+                <div><dt>Words practised</dt><dd>@Model.ItemsCompleted</dd></div>
+                @if (Model.DurationMilliseconds is { } duration)
+                {
+                    <div><dt>Time in this activity</dt><dd>@TimeSpan.FromMilliseconds(duration).ToString(@"m\:ss")</dd></div>
+                }
+            </dl>
+            <p>This is a learning activity and does not provide a diagnosis.</p>
+            <a asp-action="Index" class="btn btn-outline-primary">Back to practice activities</a>
+        </section>
+    }
+    else if (Model.CanStart)
+    {
+        <section class="admin-details-card" aria-labelledby="syllable-slicer-ready-heading">
+            <h2 id="syllable-slicer-ready-heading" class="h3">Ready when you are</h2>
+            <p>This round has @Model.TotalItems practice words. Each word is divided into syllable chunks. Put the chunks in order to build the word.</p>
+            <p>Move chunks with the buttons or drag them. You can work at a comfortable pace.</p>
+            <form asp-action="StartSyllableSlicer" asp-route-assignmentId="@Model.AssignmentId" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Start practice</button>
+            </form>
+        </section>
+    }
+    else if (question is not null && Model.AttemptId is { } attemptId)
+    {
+        <section class="screening-question-panel" aria-labelledby="syllable-slicer-prompt">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                <p class="auth-eyebrow mb-0">Word @(Model.ItemsCompleted + 1) of @Model.TotalItems</p>
+                <progress class="screening-progress" value="@Model.ItemsCompleted" max="@Model.TotalItems" aria-label="Practice progress">@Model.ItemsCompleted of @Model.TotalItems</progress>
+            </div>
+
+            <h2 id="syllable-slicer-prompt" class="h3">@question.Prompt</h2>
+            <p class="syllable-slicer-target-word" aria-label="Target word">@question.TargetWord</p>
+
+            <form asp-action="AnswerSyllableSlicer" asp-route-assignmentId="@Model.AssignmentId" method="post" id="syllable-slicer-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="AttemptId" value="@attemptId" />
+                <input type="hidden" name="ItemId" value="@question.ItemId" />
+                <input type="hidden" name="SubmissionId" value="@Model.SubmissionId" />
+                <input type="hidden" id="ordered-syllable-indexes" name="OrderedSegmentIndexes" value="@Model.OrderedSegmentIndexes" />
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+                <p id="syllable-slicer-chunks-help" class="form-label">Syllable chunks <span class="text-secondary">(drag to arrange, or use the move buttons)</span></p>
+                <ol class="syllable-slicer-chunks" id="syllable-slicer-chunks" aria-label="Syllable chunks in your answer order" aria-describedby="syllable-slicer-chunks-help">
+                @foreach (var chunk in question.Chunks)
+                {
+                    <li class="syllable-slicer-chunk" draggable="true" tabindex="0" data-index="@chunk.Index">
+                        <span class="syllable-slicer-chunk-text">@chunk.Text</span>
+                        <span class="syllable-slicer-chunk-actions">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-move="previous" aria-label="Move chunk @chunk.Text earlier">Move earlier</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-move="next" aria-label="Move chunk @chunk.Text later">Move later</button>
+                        </span>
+                    </li>
+                }
+                </ol>
+                <p id="syllable-slicer-order-status" class="visually-hidden" role="status" aria-live="polite"></p>
+
+                <button type="submit" class="btn btn-primary mt-4">Check and continue</button>
+            </form>
+        </section>
+    }
+    else
+    {
+        <p class="learner-empty-state">This practice assignment is not available right now. Please ask your support professional for help.</p>
+    }
+
+    <p class="mt-4"><a asp-action="Index">Return to practice activities</a></p>
+</section>
+
+@if (question is not null && !Model.IsCompleted)
+{
+    <script src="~/js/syllable-slicer.js" asp-append-version="true" defer></script>
+}

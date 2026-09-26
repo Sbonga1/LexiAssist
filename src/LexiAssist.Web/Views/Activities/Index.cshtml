@@ -1,0 +1,76 @@
+@model LexiAssist.Web.ViewModels.Activities.LearnerActivitiesIndexViewModel
+@{
+    ViewData["Title"] = "Practice activities";
+}
+
+<section class="dashboard-page" aria-labelledby="activities-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Learner workspace</p>
+        <h1 id="activities-heading">Practice activities</h1>
+        <p class="learner-dashboard-intro">Activities assigned by your support team will appear here. Work at a comfortable pace.</p>
+    </header>
+
+    @if (Model.Assignments.Count == 0)
+    {
+        <p class="learner-empty-state">You do not have any assigned learning activities yet.</p>
+    }
+    else
+    {
+        <div class="learner-dashboard-grid">
+        @foreach (var assignment in Model.Assignments)
+        {
+            <section class="learner-dashboard-section" aria-label="@assignment.ActivityName">
+                <p class="auth-eyebrow">@assignment.Status</p>
+                <h2>@assignment.ActivityName</h2>
+                <p>@assignment.Description</p>
+                <p class="text-secondary">Assigned @assignment.AssignedAtUtc.ToString("D").</p>
+                @if (assignment.Accuracy is { } accuracy)
+                {
+                    @if (string.Equals(assignment.ActivityName, "Fast Name Race", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <p class="mb-3">Most recent activity: @accuracy.ToString("0.#")% of completed items had no correction mark.</p>
+                    }
+                    else
+                    {
+                        <p class="mb-3">Most recent round: @accuracy.ToString("0.#")% accuracy.</p>
+                    }
+                }
+                @if (assignment.CanPlaySoundBuilder)
+                {
+                    <a asp-action="SoundBuilder" asp-route-assignmentId="@assignment.AssignmentId" class="btn btn-primary">
+                        @(assignment.Status == LexiAssist.Web.Models.Activities.ActivityAssignmentStatus.Completed ? "Review Sound Builder" : "Open Sound Builder")
+                    </a>
+                }
+                else if (assignment.CanPlayFastNameRace)
+                {
+                    <a asp-action="FastNameRace" asp-route-assignmentId="@assignment.AssignmentId" class="btn btn-primary">
+                        @(assignment.Status == LexiAssist.Web.Models.Activities.ActivityAssignmentStatus.Completed ? "Review Fast Name Race" : "Open Fast Name Race")
+                    </a>
+                }
+                else if (assignment.CanPlayWordReader)
+                {
+                    <a asp-action="WordReader" asp-route-assignmentId="@assignment.AssignmentId" class="btn btn-primary">
+                        @(assignment.Status == LexiAssist.Web.Models.Activities.ActivityAssignmentStatus.Completed ? "Review Word Reader" : "Open Word Reader")
+                    </a>
+                }
+                else if (assignment.CanPlaySyllableSlicer)
+                {
+                    <a asp-action="SyllableSlicer" asp-route-assignmentId="@assignment.AssignmentId" class="btn btn-primary">
+                        @(assignment.Status == LexiAssist.Web.Models.Activities.ActivityAssignmentStatus.Completed ? "Review Syllable Slicer" : "Open Syllable Slicer")
+                    </a>
+                }
+                else if (assignment.CanPlaySayWriteMatch)
+                {
+                    <a asp-action="SayWriteMatch" asp-route-assignmentId="@assignment.AssignmentId" class="btn btn-primary">
+                        @(assignment.Status == LexiAssist.Web.Models.Activities.ActivityAssignmentStatus.Completed ? "Review Say-Write-Match" : "Open Say-Write-Match")
+                    </a>
+                }
+                else
+                {
+                    <p class="learner-empty-state mb-0">This activity will be available here when its interactive content is ready.</p>
+                }
+            </section>
+        }
+        </div>
+    }
+</section>

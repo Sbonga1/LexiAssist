@@ -1,0 +1,176 @@
+@model LexiAssist.Web.ViewModels.AdminScreeningTests.AdminScreeningTestsIndexViewModel
+@{
+    ViewData["Title"] = "Screening Tests";
+    var hasSearch = !string.IsNullOrWhiteSpace(Model.Search);
+}
+
+<section class="admin-screening-tests-page" aria-labelledby="screening-tests-heading" data-screening-test-reorder>
+    <div class="admin-screening-tests-heading">
+        <div>
+            <p class="auth-eyebrow">Administration</p>
+            <h1 id="screening-tests-heading">Screening Tests</h1>
+            <p class="admin-screening-tests-intro">Manage the available screening tests used by learners, psychologists, and administrators.</p>
+        </div>
+        <a asp-action="Create" class="admin-screening-tests-create">
+            <span aria-hidden="true">+</span>
+            <span>Create screening test</span>
+        </a>
+    </div>
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+
+    <form asp-action="Index" method="get" class="admin-screening-tests-filter" role="search">
+        <div class="admin-screening-tests-search">
+            <label for="screening-test-search">Search screening tests</label>
+            <div class="admin-screening-tests-search-control">
+                <svg class="admin-screening-tests-search-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                    <circle cx="11" cy="11" r="6.5"></circle>
+                    <path d="m16 16 4.5 4.5"></path>
+                </svg>
+                <input id="screening-test-search" name="search" value="@Model.Search" class="form-control" placeholder="Search by name or slug..." />
+            </div>
+        </div>
+        <button type="submit" class="admin-screening-tests-search-button">Search</button>
+        @if (hasSearch)
+        {
+            <a asp-action="Index" class="admin-screening-tests-clear">Clear</a>
+        }
+    </form>
+
+    <form asp-action="Reorder" method="post" id="screening-test-reorder-form" class="visually-hidden" aria-hidden="true">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="screening-test-reorder-id" />
+        <input type="hidden" name="beforeId" id="screening-test-reorder-before-id" />
+    </form>
+    <p id="screening-test-reorder-status" class="visually-hidden" aria-live="polite"></p>
+
+    <div class="admin-screening-tests-table-surface">
+        <div class="admin-screening-tests-table-wrap">
+            <table class="table admin-screening-tests-table mb-0">
+                <caption class="visually-hidden">Configured screening tests. Use each row's drag handle to reorder tests.</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Slug</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Tests.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="admin-screening-tests-empty">No screening tests match this search.</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var test in Model.Tests)
+                    {
+                        <tr data-screening-test-row data-test-id="@test.Id">
+                            <td class="admin-screening-tests-order">
+                                <button type="button" class="admin-screening-tests-drag-handle" draggable="true" aria-label="Drag to reorder @test.Name" aria-pressed="false">
+                                    <span aria-hidden="true">⠿</span>
+                                </button>
+                                <span class="admin-screening-tests-order-number">@test.SortOrder</span>
+                            </td>
+                            <td class="admin-screening-tests-name">@test.Name</td>
+                            <td class="admin-screening-tests-slug"><code>@test.Slug</code></td>
+                            <td>
+                                @if (test.IsActive)
+                                {
+                                    <span class="admin-screening-tests-status admin-screening-tests-status-active">
+                                        <span class="admin-screening-tests-status-dot" aria-hidden="true"></span>
+                                        <span>Active</span>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="admin-screening-tests-status admin-screening-tests-status-inactive">
+                                        <span class="admin-screening-tests-status-dot" aria-hidden="true"></span>
+                                        <span>Inactive</span>
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                <div class="admin-screening-tests-actions">
+                                    <a asp-action="Details" asp-route-id="@test.Id" class="admin-screening-tests-action admin-screening-tests-action-neutral">View</a>
+                                    <a asp-action="Edit" asp-route-id="@test.Id" class="admin-screening-tests-action admin-screening-tests-action-neutral">Edit</a>
+                                    @if (test.IsActive)
+                                    {
+                                        <form asp-action="Deactivate" asp-route-id="@test.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="admin-screening-tests-action admin-screening-tests-action-danger">Deactivate</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="Activate" asp-route-id="@test.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="admin-screening-tests-action admin-screening-tests-action-success">Activate</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="admin-screening-tests-table-footer">
+            <span class="admin-screening-tests-count">@Model.TotalItems test(s)</span>
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="Screening test pages">
+                    <ul class="pagination admin-screening-tests-pagination mb-0">
+                        <li class="page-item @(Model.HasPreviousPage ? string.Empty : "disabled")">
+                            @if (Model.HasPreviousPage)
+                            {
+                                <a class="page-link" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.CurrentPage - 1)" aria-label="Previous page">‹</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true" aria-label="Previous page">‹</span>
+                            }
+                        </li>
+                        @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+                        {
+                            var isCurrentPage = pageNumber == Model.CurrentPage;
+                            <li class="page-item @(isCurrentPage ? "active" : string.Empty)">
+                                @if (isCurrentPage)
+                                {
+                                    <span class="page-link" aria-current="page">@pageNumber</span>
+                                }
+                                else
+                                {
+                                    <a class="page-link" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@pageNumber">@pageNumber</a>
+                                }
+                            </li>
+                        }
+                        <li class="page-item @(Model.HasNextPage ? string.Empty : "disabled")">
+                            @if (Model.HasNextPage)
+                            {
+                                <a class="page-link" asp-action="Index" asp-route-search="@Model.Search" asp-route-page="@(Model.CurrentPage + 1)" aria-label="Next page">›</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true" aria-label="Next page">›</span>
+                            }
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    </div>
+
+    <div class="admin-screening-tests-preservation" role="note">
+        <span class="admin-screening-tests-preservation-icon" aria-hidden="true">i</span>
+        <span>Deactivating a test preserves its record and any related data.</span>
+    </div>
+</section>

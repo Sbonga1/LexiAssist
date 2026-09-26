@@ -1,0 +1,49 @@
+@model LexiAssist.Web.ViewModels.Resources.EducationalResourceDetailsViewModel
+@{
+    ViewData["Title"] = "Educational resource details";
+}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <p class="auth-eyebrow">Administration · Educational resources</p>
+        <h1 class="h2 mb-1">@Model.Title</h1>
+        <p class="text-secondary mb-0">@Model.ResourceType</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary">Edit</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to resources</a>
+    </div>
+</div>
+
+@if (TempData["StatusMessage"] is string statusMessage)
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+
+<article class="resource-detail">
+    <p class="lead text-secondary">@Model.Summary</p>
+    <div class="resource-content mt-4">@Model.Content</div>
+    @if (!string.IsNullOrWhiteSpace(Model.ExternalUrl))
+    {
+        <p class="mt-4 mb-0"><a href="@Model.ExternalUrl" target="_blank" rel="noopener noreferrer">Open external resource</a></p>
+    }
+</article>
+
+<div class="mt-4 d-flex flex-wrap align-items-center gap-3">
+    @if (Model.IsPublished)
+    {
+        <span class="badge text-bg-success">Published</span>
+        <form asp-action="Unpublish" asp-route-id="@Model.Id" method="post" class="d-inline">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-secondary">Unpublish</button>
+        </form>
+    }
+    else
+    {
+        <span class="badge text-bg-secondary">Draft</span>
+        <form asp-action="Publish" asp-route-id="@Model.Id" method="post" class="d-inline">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-success">Publish</button>
+        </form>
+    }
+</div>

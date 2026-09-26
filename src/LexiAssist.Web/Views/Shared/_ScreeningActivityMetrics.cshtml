@@ -1,0 +1,78 @@
+@using LexiAssist.Web.Models.Screening
+@model IReadOnlyList<ScreeningActivityMetric>
+
+@if (Model.Count > 0)
+{
+    <div class="border rounded p-3 mt-3">
+        <h4 class="h6 mb-2">Neutral activity measures</h4>
+        <p class="small text-secondary mb-3">These are descriptive values from the configured activities. They are not diagnostic measurements.</p>
+        @foreach (var metric in Model)
+        {
+            <section class="mb-3 last-child-mb-0" aria-labelledby="metric-@metric.ActivityType-heading">
+                <h5 id="metric-@metric.ActivityType-heading" class="h6">@metric.ActivityName</h5>
+                <dl class="row small mb-0">
+                    @if (metric.ItemsAttempted is { } itemsAttempted)
+                    {
+                        <dt class="col-sm-6">Items attempted</dt>
+                        <dd class="col-sm-6">@itemsAttempted</dd>
+                    }
+                    @if (metric.ItemsCorrect is { } itemsCorrect)
+                    {
+                        <dt class="col-sm-6">Items correct</dt>
+                        <dd class="col-sm-6">@itemsCorrect</dd>
+                    }
+                    @if (metric.ItemsIncorrect is { } itemsIncorrect)
+                    {
+                        <dt class="col-sm-6">Items incorrect</dt>
+                        <dd class="col-sm-6">@itemsIncorrect</dd>
+                    }
+                    @if (metric.AvailableItemCount is { } availableItemCount)
+                    {
+                        <dt class="col-sm-6">Configured items</dt>
+                        <dd class="col-sm-6">@availableItemCount</dd>
+                    }
+                    @if (metric.AccuracyPercentage is { } accuracy)
+                    {
+                        <dt class="col-sm-6">Accuracy</dt>
+                        <dd class="col-sm-6">@accuracy.ToString("0.##")%</dd>
+                    }
+                    @if (metric.HighestCorrectlyCompletedSequenceLength is { } highestSequenceLength)
+                    {
+                        <dt class="col-sm-6">Highest correctly completed sequence</dt>
+                        <dd class="col-sm-6">@highestSequenceLength items</dd>
+                    }
+                    @if (metric.ElapsedTimeMilliseconds is { } elapsedTime)
+                    {
+                        <dt class="col-sm-6">Elapsed time</dt>
+                        <dd class="col-sm-6">@elapsedTime.ToString("N0") ms</dd>
+                    }
+                    @if (metric.AverageResponseTimeMilliseconds is { } averageResponseTime)
+                    {
+                        <dt class="col-sm-6">Average response time</dt>
+                        <dd class="col-sm-6">@averageResponseTime.ToString("N0") ms</dd>
+                    }
+                    @if (metric.MedianResponseTimeMilliseconds is { } medianResponseTime)
+                    {
+                        <dt class="col-sm-6">Median response time</dt>
+                        <dd class="col-sm-6">@medianResponseTime.ToString("N0") ms</dd>
+                    }
+                    @if (metric.RawCorrectCount is { } rawCorrectCount)
+                    {
+                        <dt class="col-sm-6">Raw correct count</dt>
+                        <dd class="col-sm-6">@rawCorrectCount.ToString("0.##")</dd>
+                    }
+                    @if (metric.AvailableScore is { } availableScore)
+                    {
+                        <dt class="col-sm-6">Available score</dt>
+                        <dd class="col-sm-6">@availableScore.ToString("0.##")</dd>
+                    }
+                    @if (metric.Percentage is { } percentage)
+                    {
+                        <dt class="col-sm-6">Configured percentage</dt>
+                        <dd class="col-sm-6">@percentage.ToString("0.##")%</dd>
+                    }
+                </dl>
+            </section>
+        }
+    </div>
+}

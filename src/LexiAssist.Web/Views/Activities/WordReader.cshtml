@@ -1,0 +1,141 @@
+@model LexiAssist.Web.ViewModels.Activities.WordReaderPlayViewModel
+@{
+    ViewData["Title"] = "Word Reader";
+    var currentItem = Model.CurrentItem;
+}
+
+<section class="dashboard-page word-reader-page" aria-labelledby="word-reader-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Practice activity · @Model.SkillArea</p>
+        <h1 id="word-reader-heading">Word Reader</h1>
+        <p class="learner-dashboard-intro">Read the displayed word aloud, then choose how the practice try went. You can repeat a word whenever you want more practice.</p>
+    </header>
+
+    @if (Model.AudioRecorder is { } audioRecorder)
+    {
+        <partial name="_LearnerAudioRecorder" model="audioRecorder" />
+    }
+
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="status">@errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Message))
+    {
+        <div class="alert alert-warning" role="status">@Model.Message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Feedback))
+    {
+        <div class="alert alert-info" role="status">@Model.Feedback</div>
+    }
+
+    @if (Model.IsCompleted)
+    {
+        <section class="admin-details-card" aria-labelledby="word-reader-complete-heading">
+            <h2 id="word-reader-complete-heading" class="h3">Practice set complete</h2>
+            <p>You worked through @Model.ItemsCompleted of @Model.TotalItems words for <strong>@Model.SkillArea</strong>.</p>
+            <dl class="fast-name-race-results">
+                <div><dt>Practice responses saved</dt><dd>@Model.ResponseCount</dd></div>
+                <div><dt>Repeat tries requested</dt><dd>@Model.RetryCount</dd></div>
+                <div><dt>Supported practice tries</dt><dd>@Model.SupportedPracticeCount</dd></div>
+                @if (Model.DurationMilliseconds is { } duration)
+                {
+                    <div><dt>Time in this activity</dt><dd>@TimeSpan.FromMilliseconds(duration).ToString(@"m\:ss")</dd></div>
+                }
+            </dl>
+            @if (Model.AudioRecorder is null)
+            {
+                <p>These notes reflect the practice choices you made. LexiAssist did not record or evaluate your speech.</p>
+            }
+            else
+            {
+                <p>These notes reflect the practice choices you made. LexiAssist does not automatically evaluate speech.</p>
+            }
+            <a asp-action="Index" class="btn btn-outline-primary">Back to practice activities</a>
+        </section>
+    }
+    else if (Model.CanStart)
+    {
+        <section class="admin-details-card" aria-labelledby="word-reader-ready-heading">
+            <h2 id="word-reader-ready-heading" class="h3">Practice focus: @Model.SkillArea</h2>
+            <p>This set has @Model.TotalItems configured practice words. Read each word aloud, then tell us how the try went. The page stores your choice; it does not listen to or judge pronunciation.</p>
+            <p>Some words may have an optional audio model to listen to.</p>
+            <form asp-action="StartWordReader" asp-route-assignmentId="@Model.AssignmentId" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Start word practice</button>
+            </form>
+        </section>
+    }
+    else if (currentItem is not null && Model.AttemptId is { } attemptId)
+    {
+        <section class="screening-question-panel word-reader-panel" aria-labelledby="word-reader-item-heading">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                <p class="auth-eyebrow mb-0">Word @(Model.ItemsCompleted + 1) of @Model.TotalItems</p>
+                <progress class="screening-progress" value="@Model.ItemsCompleted" max="@Model.TotalItems" aria-label="Word practice progress">@Model.ItemsCompleted of @Model.TotalItems</progress>
+            </div>
+
+            <h2 id="word-reader-item-heading" class="h3">Read this word aloud</h2>
+            @if (Model.AudioRecorder is not null)
+            {
+                <p class="text-secondary">Speech is not automatically evaluated. Use the optional recording controls above only if you choose to record.</p>
+            }
+            else
+            {
+                <p class="text-secondary">This activity does not record your voice or automatically evaluate pronunciation.</p>
+            }
+            <p class="word-reader-target" aria-label="Practice word">@currentItem.Word</p>
+
+            @if (currentItem.AudioPath is not null)
+            {
+                <div class="word-reader-audio">
+                    <label for="word-reader-audio-player" class="form-label">Optional audio model</label>
+                    <audio id="word-reader-audio-player" controls preload="none" aria-label="Optional audio model for this word" aria-describedby="word-reader-audio-error">
+                        <source src="@currentItem.AudioPath" />
+                        Your browser cannot play this audio. You can continue by reading the displayed word.
+                    </audio>
+                    <p id="word-reader-audio-error" class="form-text" hidden>Audio playback is unavailable for this word right now. You can continue by reading the displayed word.</p>
+                </div>
+            }
+            else if (currentItem.AudioUnavailable)
+            {
+                <p class="alert alert-warning" role="status">Audio playback is unavailable for this word right now. You can continue by reading the displayed word.</p>
+            }
+
+            <form asp-action="AnswerWordReader" asp-route-assignmentId="@Model.AssignmentId" method="post" id="word-reader-answer-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="AttemptId" value="@attemptId" />
+                <input type="hidden" name="ItemId" value="@currentItem.Id" />
+                <input type="hidden" name="SubmissionId" value="@Model.SubmissionId" />
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+                <fieldset class="mb-4">
+                    <legend class="form-label">How did that try go?</legend>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" id="word-reader-independent" name="Outcome" value="ReadWithoutHelp" required />
+                        <label class="form-check-label" for="word-reader-independent">I read it without help</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" id="word-reader-supported" name="Outcome" value="PractisedWithSupport" required />
+                        <label class="form-check-label" for="word-reader-supported">I practised it with support</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="word-reader-retry" name="Outcome" value="RetryRequested" required />
+                        <label class="form-check-label" for="word-reader-retry">I would like to try this word again</label>
+                    </div>
+                </fieldset>
+                <button type="submit" class="btn btn-primary">Save and continue</button>
+            </form>
+        </section>
+    }
+    else
+    {
+        <p class="learner-empty-state">This practice assignment is not available right now. Please ask your support professional for help.</p>
+    }
+
+    <p class="mt-4"><a asp-action="Index">Return to practice activities</a></p>
+</section>
+
+@if (!Model.IsCompleted && currentItem?.AudioPath is not null)
+{
+    <script src="~/js/word-reader.js" asp-append-version="true" defer></script>
+}

@@ -1,0 +1,77 @@
+@using LexiAssist.Web.Models.Screening
+@using LexiAssist.Web.Models.Reports
+@using LexiAssist.Web.ViewModels.Referrals
+@model ScreeningReportSkillAreaSnapshot
+
+<section class="admin-details-card mb-4" aria-labelledby="memory-broader-thinking-passport-heading">
+    <h2 id="memory-broader-thinking-passport-heading" class="h4">Memory and Broader Thinking Skills</h2>
+    <p class="text-secondary"><strong>Screening indicator:</strong> These original activities provide screening information only. They do not establish intellectual ability, disability, diagnosis, or clinical impairment. Additional professional interpretation may be appropriate.</p>
+
+    <h3 class="h5 mt-4">Activity completion</h3>
+    @if (Model.ActivityMetrics.Count == 0)
+    {
+        <p class="text-secondary">The category snapshot is stored, but detailed activity measures are not available.</p>
+    }
+    else
+    {
+        <p>Activity measures were stored for the completed optional screening category.</p>
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Memory and Broader Thinking Skills screening indicators</caption>
+                <thead class="table-light">
+                    <tr><th scope="col">Activity</th><th scope="col">Completion and score</th><th scope="col">Accuracy</th><th scope="col">Response-time information</th></tr>
+                </thead>
+                <tbody>
+                @foreach (var metric in Model.ActivityMetrics)
+                {
+                    var activityName = metric.ActivityType switch
+                    {
+                        ScreeningQuestionType.WorkingMemorySequence => "Working Memory",
+                        ScreeningQuestionType.TimedMatching => "Processing Speed",
+                        ScreeningQuestionType.PatternReasoning => "Pattern Reasoning",
+                        _ => metric.ActivityName
+                    };
+                    var completion = metric.ItemsAttempted is { } attempted && metric.AvailableItemCount is { } available
+                        ? $"{attempted} attempted of {available} items"
+                        : metric.ItemsCorrect is { } correct && metric.AvailableScore is { } availableScore
+                            ? $"{correct:0.##} of {availableScore:0.##} available"
+                            : "Stored indicator";
+                    var correctSummary = metric.ItemsCorrect is { } itemsCorrect
+                        ? $"Correct: {itemsCorrect}"
+                        : null;
+                    var score = metric.ActivityType == ScreeningQuestionType.PatternReasoning &&
+                                metric.RawCorrectCount is { } rawCorrect && metric.AvailableScore is { } patternAvailable
+                        ? $"{rawCorrect:0.##} of {patternAvailable:0.##} correct"
+                        : metric.ActivityType == ScreeningQuestionType.WorkingMemorySequence &&
+                          metric.HighestCorrectlyCompletedSequenceLength is { } sequenceLength
+                            ? $"Highest configured sequence: {sequenceLength} items"
+                            : completion;
+                    var responseTime = metric.ElapsedTimeMilliseconds is { } elapsed
+                        ? $"Elapsed: {elapsed:N0} ms"
+                        : metric.MedianResponseTimeMilliseconds is { } median
+                            ? $"Median: {median:N0} ms"
+                            : metric.AverageResponseTimeMilliseconds is { } average
+                                ? $"Average: {average:N0} ms"
+                                : "Not recorded";
+                    <tr>
+                        <th scope="row">@activityName</th>
+                        <td>
+                            @completion
+                            @if (correctSummary is not null)
+                            {
+                                <span class="d-block">@correctSummary</span>
+                            }
+                            @if (!string.Equals(completion, score, StringComparison.Ordinal))
+                            {
+                                <span class="d-block">@score</span>
+                            }
+                        </td>
+                        <td>@(metric.AccuracyPercentage is { } accuracy ? $"{accuracy:0.##}%" : metric.Percentage is { } percentage ? $"{percentage:0.##}%" : "Not available")</td>
+                        <td>@responseTime</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

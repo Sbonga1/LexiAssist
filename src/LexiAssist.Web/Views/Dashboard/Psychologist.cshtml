@@ -1,0 +1,114 @@
+@model LexiAssist.Web.ViewModels.PsychologistDashboardViewModel
+@{
+    ViewData["Title"] = "Psychologist dashboard";
+}
+
+<section class="dashboard-page psychologist-dashboard" aria-labelledby="dashboard-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Professional workspace</p>
+        <h1 id="dashboard-heading">Psychologist dashboard</h1>
+        <p class="learner-dashboard-intro">Review and manage referrals assigned to your account.</p>
+    </header>
+
+    <div class="alert alert-info" role="note">
+        LexiAssist provides educational screening and support information. Screening tiers are not clinical diagnoses.
+    </div>
+
+    <section class="mb-4" aria-labelledby="assigned-pending-heading">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h2 id="assigned-pending-heading" class="h4 mb-1">Assigned pending referrals</h2>
+                <p class="text-secondary mb-0">These referrals are assigned to you and are awaiting review.</p>
+            </div>
+            <a asp-controller="PsychologistReferrals" asp-action="Index" class="btn btn-sm btn-outline-primary">All assigned referrals</a>
+        </div>
+        @if (Model.AssignedPendingReferrals.Count == 0)
+        {
+            <p class="learner-empty-state">No assigned referrals are waiting for your review.</p>
+        }
+        else
+        {
+            <div class="table-responsive bg-white border rounded-3">
+                <table class="table table-hover align-middle mb-0">
+                    <caption class="visually-hidden">Assigned pending referrals</caption>
+                    <thead class="table-light"><tr><th scope="col">Learner</th><th scope="col">Risk/support tier</th><th scope="col">Referral date (UTC)</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                    <tbody>
+                    @foreach (var referral in Model.AssignedPendingReferrals)
+                    {
+                        <tr>
+                            <th scope="row">@referral.LearnerName</th>
+                            <td><span class="screening-tier-badge screening-tier-red">@referral.RiskTier</span></td>
+                            <td>@referral.ReferralDateUtc.ToString("yyyy-MM-dd")</td>
+                            <td class="text-end"><a asp-controller="PsychologistReferrals" asp-action="Details" asp-route-id="@referral.ReferralId" class="btn btn-sm btn-outline-primary">Review</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="mb-4" aria-labelledby="under-review-heading">
+        <div class="mb-3">
+            <h2 id="under-review-heading" class="h4 mb-1">Referrals under review</h2>
+            <p class="text-secondary mb-0">Cases where review has started.</p>
+        </div>
+        @if (Model.ReferralsUnderReview.Count == 0)
+        {
+            <p class="learner-empty-state">You have no referrals under review.</p>
+        }
+        else
+        {
+            <div class="table-responsive bg-white border rounded-3">
+                <table class="table table-hover align-middle mb-0">
+                    <caption class="visually-hidden">Referrals currently under review</caption>
+                    <thead class="table-light"><tr><th scope="col">Learner</th><th scope="col">Risk/support tier</th><th scope="col">Referral date (UTC)</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                    <tbody>
+                    @foreach (var referral in Model.ReferralsUnderReview)
+                    {
+                        <tr>
+                            <th scope="row">@referral.LearnerName</th>
+                            <td><span class="screening-tier-badge screening-tier-red">@referral.RiskTier</span></td>
+                            <td>@referral.ReferralDateUtc.ToString("yyyy-MM-dd")</td>
+                            <td class="text-end"><a asp-controller="PsychologistReferrals" asp-action="Details" asp-route-id="@referral.ReferralId" class="btn btn-sm btn-outline-primary">Continue review</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section aria-labelledby="recently-reviewed-heading">
+        <div class="mb-3">
+            <h2 id="recently-reviewed-heading" class="h4 mb-1">Recently reviewed cases</h2>
+            <p class="text-secondary mb-0">Recent follow-up requests, completed reviews, and closed cases assigned to you.</p>
+        </div>
+        @if (Model.RecentlyReviewedCases.Count == 0)
+        {
+            <p class="learner-empty-state">No recently reviewed cases to show.</p>
+        }
+        else
+        {
+            <div class="table-responsive bg-white border rounded-3">
+                <table class="table table-hover align-middle mb-0">
+                    <caption class="visually-hidden">Recently reviewed referral cases</caption>
+                    <thead class="table-light"><tr><th scope="col">Learner</th><th scope="col">Risk/support tier</th><th scope="col">Referral date (UTC)</th><th scope="col">Reviewed (UTC)</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                    <tbody>
+                    @foreach (var referral in Model.RecentlyReviewedCases)
+                    {
+                        <tr>
+                            <th scope="row">@referral.LearnerName</th>
+                            <td><span class="screening-tier-badge screening-tier-red">@referral.RiskTier</span></td>
+                            <td>@referral.ReferralDateUtc.ToString("yyyy-MM-dd")</td>
+                            <td>@referral.ReviewedAtUtc?.ToString("yyyy-MM-dd")</td>
+                            <td>@referral.Status</td>
+                            <td class="text-end"><a asp-controller="PsychologistReferrals" asp-action="Details" asp-route-id="@referral.ReferralId" class="btn btn-sm btn-outline-primary">View case</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</section>

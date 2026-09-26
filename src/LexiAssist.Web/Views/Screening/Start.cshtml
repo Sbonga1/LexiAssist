@@ -1,0 +1,39 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningStartViewModel
+@{
+    ViewData["Title"] = "Start screening";
+}
+
+<section class="dashboard-page" aria-labelledby="start-screening-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Learner workspace</p>
+        <h1 id="start-screening-heading">Start screening</h1>
+        <p class="learner-dashboard-intro">This educational screening brings together the active categories listed below.</p>
+    </header>
+
+    <partial name="_ScreeningNotice" />
+
+    <section aria-labelledby="included-categories-heading" class="mb-4">
+        <h2 id="included-categories-heading" class="h4">Categories included</h2>
+        <ol class="list-group list-group-numbered screening-category-list">
+        @foreach (var category in Model.Categories)
+        {
+            <li class="list-group-item">@category.Name</li>
+        }
+        </ol>
+    </section>
+
+    @if (Model.CanStart)
+    {
+        <p class="text-secondary">Your progress is saved as you answer. You can pause and return to the screening later.</p>
+        <form asp-action="Start" method="post" class="d-flex flex-wrap gap-2">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-primary">Begin screening</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        </form>
+    }
+    else
+    {
+        <p class="learner-empty-state">Screening questions are not ready yet, so a screening cannot be started right now.</p>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to screening</a>
+    }
+</section>

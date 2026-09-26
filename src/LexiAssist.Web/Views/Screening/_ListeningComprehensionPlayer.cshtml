@@ -1,0 +1,25 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningRunnerViewModel
+@{
+    var replayLimitAttribute = Model.MaxAudioReplays?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+}
+
+<div class="listening-comprehension-player mb-3"
+     data-listening-player
+     data-audio-url="@Model.AudioSourceUrl"
+     data-max-replays="@replayLimitAttribute">
+    <audio src="@Model.AudioSourceUrl" preload="metadata" data-listening-audio aria-label="Audio for the listening comprehension question"></audio>
+    @if (Model.MaxAudioReplays is int replayLimit)
+    {
+        <p>You may replay the audio up to @replayLimit time(s) after the first listen.</p>
+    }
+    else
+    {
+        <p>You may replay the audio as needed.</p>
+    }
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-primary" data-listening-play>Play audio</button>
+        <button type="button" class="btn btn-outline-secondary" data-listening-replay disabled>Replay audio</button>
+    </div>
+    <p class="mt-2 mb-1" role="status" aria-live="polite" data-listening-status></p>
+    <div class="alert alert-danger mt-2" role="alert" tabindex="-1" data-listening-error hidden></div>
+</div>

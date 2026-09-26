@@ -1,0 +1,161 @@
+@using LexiAssist.Web.Models.Identity
+@{
+    ViewData["Title"] = "Learning support, made more human";
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isLearner = !isAuthenticated || User.IsInRole(ApplicationRoles.Learner);
+    var dashboardAction = User.IsInRole(ApplicationRoles.Administrator)
+        ? "Administrator"
+        : User.IsInRole(ApplicationRoles.Psychologist)
+            ? "Psychologist"
+            : "Learner";
+}
+
+<div class="lexi-landing" aria-labelledby="home-heading">
+    <section class="lexi-landing-hero">
+        <div class="landing-container landing-hero-grid">
+            <div class="landing-hero-copy landing-reveal" data-reveal="left">
+                <p class="landing-eyebrow">A learning space that listens</p>
+                <h1 id="home-heading">Helping every learner find their <span>next confident step.</span></h1>
+                <p class="landing-hero-lede">LexiAssist brings screening, focused practice, progress, and professional support together in one welcoming place.</p>
+                <div class="landing-actions">
+                    @if (isAuthenticated)
+                    {
+                        <a asp-controller="Dashboard" asp-action="@dashboardAction" class="btn landing-btn landing-btn-primary">Go to your dashboard <span aria-hidden="true">&#8594;</span></a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Account" asp-action="Register" class="btn landing-btn landing-btn-primary">Create a learner account <span aria-hidden="true">&#8594;</span></a>
+                        <a asp-controller="Account" asp-action="Login" class="landing-text-link">Sign in <span aria-hidden="true">&#8594;</span></a>
+                    }
+                </div>
+                <a class="landing-play-link" href="#how-it-works">
+                    <span class="landing-play-icon" aria-hidden="true">&#9654;</span>
+                    <span>See how LexiAssist works</span>
+                </a>
+            </div>
+
+            <div class="landing-hero-art landing-reveal" data-reveal="right" aria-label="Learner surrounded by learning support tools">
+                <div class="landing-art-orbit" aria-hidden="true"></div>
+                <div class="landing-art-spark landing-art-spark-one" aria-hidden="true"></div>
+                <div class="landing-art-spark landing-art-spark-two" aria-hidden="true"></div>
+                <img class="landing-hero-person" src="~/assets/skilline/girl.png" alt="Smiling learner holding colourful books" />
+                <div class="landing-float-card landing-float-card-screening landing-floating-slow">
+                    <span class="landing-float-icon landing-float-icon-blue" aria-hidden="true">&#10003;</span>
+                    <span><strong>Screening</strong><small>Clearer next steps</small></span>
+                </div>
+                <div class="landing-float-card landing-float-card-practice landing-floating">
+                    <span class="landing-float-icon landing-float-icon-coral" aria-hidden="true">&#9733;</span>
+                    <span><strong>Practice</strong><small>Small wins, every day</small></span>
+                </div>
+                <div class="landing-float-card landing-float-card-progress landing-floating-slow">
+                    <span class="landing-progress-ring" aria-hidden="true">&#8599;</span>
+                    <span><strong>Progress</strong><small>Built around you</small></span>
+                </div>
+            </div>
+        </div>
+        <div class="landing-hero-wave" aria-hidden="true"></div>
+    </section>
+
+    <section class="landing-proof" aria-labelledby="proof-heading">
+        <div class="landing-container">
+            <p id="proof-heading" class="landing-proof-label">One thoughtful space for the whole learning journey</p>
+            <div class="landing-proof-items">
+                <span><strong>01</strong> Notice patterns</span>
+                <span><strong>02</strong> Build confidence</span>
+                <span><strong>03</strong> Share progress</span>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="landing-section landing-section-light" aria-labelledby="how-heading">
+        <div class="landing-container">
+            <div class="landing-section-heading landing-reveal" data-reveal="up">
+                <p class="landing-eyebrow">A calm path forward</p>
+                <h2 id="how-heading">Everything you need to make learning feel possible.</h2>
+                <p>Purposeful tools for learners, useful context for professionals, and a gentle experience from the first click.</p>
+            </div>
+            <div class="landing-feature-grid">
+                <article class="landing-feature-card landing-reveal" data-reveal="up">
+                    <div class="landing-feature-icon landing-feature-icon-blue" aria-hidden="true">&#10003;</div>
+                    <h3>Understand the starting point</h3>
+                    <p>Screening activities help surface patterns across reading, language, spelling, and listening.</p>
+                    @if (isLearner)
+                    {
+                        <a asp-controller="Screening" asp-action="Index" class="landing-card-link">Explore screening <span aria-hidden="true">&#8594;</span></a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Dashboard" asp-action="@dashboardAction" class="landing-card-link">Open your workspace <span aria-hidden="true">&#8594;</span></a>
+                    }
+                </article>
+                <article class="landing-feature-card landing-reveal" data-reveal="up" data-reveal-delay="120">
+                    <div class="landing-feature-icon landing-feature-icon-yellow" aria-hidden="true">&#9733;</div>
+                    <h3>Turn practice into small wins</h3>
+                    <p>Interactive activities make it easier to return, try again, and notice progress without pressure.</p>
+                    @if (isLearner)
+                    {
+                        <a asp-controller="Activities" asp-action="Index" class="landing-card-link">Open practice <span aria-hidden="true">&#8594;</span></a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Dashboard" asp-action="@dashboardAction" class="landing-card-link">Open your workspace <span aria-hidden="true">&#8594;</span></a>
+                    }
+                </article>
+                <article class="landing-feature-card landing-reveal" data-reveal="up" data-reveal-delay="240">
+                    <div class="landing-feature-icon landing-feature-icon-coral" aria-hidden="true">&#9829;</div>
+                    <h3>Keep support connected</h3>
+                    <p>Progress views and professional insight keep the right people close to the learner’s journey.</p>
+                    @if (isAuthenticated)
+                    {
+                        <a asp-controller="Dashboard" asp-action="@dashboardAction" class="landing-card-link">View your workspace <span aria-hidden="true">&#8594;</span></a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Account" asp-action="Register" class="landing-card-link">Get started <span aria-hidden="true">&#8594;</span></a>
+                    }
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-section landing-story" aria-labelledby="story-heading">
+        <div class="landing-container landing-story-grid">
+            <div class="landing-story-art landing-reveal" data-reveal="left">
+                <div class="landing-story-blob" aria-hidden="true"></div>
+                <img src="~/assets/skilline/girl-with-books.png" alt="Learner sitting with books and a laptop" />
+                <div class="landing-story-note landing-floating">
+                    <span class="landing-story-note-dot" aria-hidden="true"></span>
+                    <span><strong>Progress you can see</strong><small>Made for encouragement</small></span>
+                </div>
+            </div>
+            <div class="landing-story-copy landing-reveal" data-reveal="right">
+                <p class="landing-eyebrow">Designed for real learning journeys</p>
+                <h2 id="story-heading">Support that meets learners where they are.</h2>
+                <p>LexiAssist keeps each step focused and understandable, so learners can practise with confidence and professionals can respond with context.</p>
+                <ul class="landing-check-list">
+                    <li><span aria-hidden="true">&#10003;</span> Accessible by design, with reading preferences built in</li>
+                    <li><span aria-hidden="true">&#10003;</span> Supportive feedback that keeps effort moving forward</li>
+                    <li><span aria-hidden="true">&#10003;</span> Secure sharing between learners and authorised professionals</li>
+                </ul>
+                <a asp-controller="Home" asp-action="Privacy" class="landing-text-link">Learn about privacy and care <span aria-hidden="true">&#8594;</span></a>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-cta landing-reveal" data-reveal="up" aria-labelledby="cta-heading">
+        <div class="landing-container landing-cta-inner">
+            <div>
+                <p class="landing-eyebrow">Your next step can be small</p>
+                <h2 id="cta-heading">Ready to make learning feel a little lighter?</h2>
+            </div>
+            @if (isAuthenticated)
+            {
+                <a asp-controller="Dashboard" asp-action="@dashboardAction" class="btn landing-btn landing-btn-light">Continue to dashboard <span aria-hidden="true">&#8594;</span></a>
+            }
+            else
+            {
+                <a asp-controller="Account" asp-action="Register" class="btn landing-btn landing-btn-light">Start with LexiAssist <span aria-hidden="true">&#8594;</span></a>
+            }
+        </div>
+    </section>
+</div>

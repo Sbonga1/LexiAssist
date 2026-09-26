@@ -1,0 +1,212 @@
+@model LexiAssist.Web.ViewModels.LearnerProgressViewModel
+@{
+    ViewData["Title"] = "Learner progress";
+    var maxFrequency = Model.ActivityFrequency.Count == 0 ? 1 : Model.ActivityFrequency.Max(point => point.ActivityCount);
+}
+
+<section class="progress-page" aria-labelledby="progress-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Learner workspace</p>
+        <h1 id="progress-heading">Learner progress</h1>
+        <p class="learner-dashboard-intro">Review recorded screening and practice activity over time.</p>
+    </header>
+
+    <div class="progress-note" role="note">
+        These summaries describe recorded educational screening and practice activity. Practice patterns can change for many reasons and do not diagnose or show that a medical condition has changed.
+    </div>
+
+    @if (!Model.HasAnyData)
+    {
+        <div class="learner-empty-state progress-empty-state" role="status">
+            <h2 class="h5">Progress will appear here as you use LexiAssist</h2>
+            <p class="mb-0">Complete a screening or try an assigned practice activity to start building your private progress history.</p>
+        </div>
+    }
+
+    <section class="progress-section" aria-labelledby="screening-history-heading">
+        <div class="progress-section-heading">
+            <div>
+                <h2 id="screening-history-heading">Screening history</h2>
+                <p class="text-secondary mb-0">Completed screening sessions saved to your account.</p>
+            </div>
+        </div>
+        @if (Model.ScreeningHistory.Count == 0)
+        {
+            <p class="learner-empty-state">No completed screening sessions are available yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table progress-table align-middle">
+                    <caption class="visually-hidden">Completed screening sessions and stored overall scores</caption>
+                    <thead>
+                        <tr><th scope="col">Date</th><th scope="col">Overall score</th><th scope="col">Categories recorded</th><th scope="col">Details</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var screening in Model.ScreeningHistory)
+                    {
+                        <tr>
+                            <td>@screening.CompletedAtUtc.ToLocalTime().ToString("d")</td>
+                            <td>@(screening.OverallScore is { } score ? $"{score:0.#}%" : "Not available")</td>
+                            <td>@screening.CategoryCount</td>
+                            <td><a asp-controller="Screening" asp-action="Results" asp-route-attemptId="@screening.AttemptId">View screening result</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <figure class="progress-chart" aria-labelledby="screening-chart-caption">
+                <figcaption id="screening-chart-caption">Stored overall score by completed screening session</figcaption>
+                <div class="progress-chart-bars">
+                @foreach (var screening in Model.ScreeningHistory)
+                {
+                    var scoreWidth = screening.OverallScore is { } score ? Math.Clamp(score, 0, 100) : 0;
+                    <div class="progress-chart-row">
+                        <span class="progress-chart-label">@screening.CompletedAtUtc.ToLocalTime().ToString("d")</span>
+                        <div class="progress-chart-track" aria-hidden="true"><span style="width: @scoreWidth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                        <span class="progress-chart-value">@(screening.OverallScore is { } value ? $"{value:0.#}%" : "n/a")</span>
+                    </div>
+                }
+                </div>
+            </figure>
+
+            @if (Model.ScreeningCategoryScores.Count > 0)
+            {
+                <div class="table-responsive mt-4">
+                    <table class="table progress-table align-middle">
+                        <caption class="visually-hidden">Stored screening category scores</caption>
+                        <thead><tr><th scope="col">Category</th><th scope="col">Date</th><th scope="col">Stored score</th></tr></thead>
+                        <tbody>
+                        @foreach (var category in Model.ScreeningCategoryScores)
+                        {
+                            <tr>
+                                <th scope="row">@category.CategoryName</th>
+                                <td>@category.CompletedAtUtc.ToLocalTime().ToString("d")</td>
+                                <td>@(category.PercentageScore is { } score ? $"{score:0.#}%" : "Not available")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </section>
+
+    <section class="progress-section" aria-labelledby="practice-summary-heading">
+        <div class="progress-section-heading">
+            <div>
+                <h2 id="practice-summary-heading">Practice activities</h2>
+                <p class="text-secondary mb-0">Attempts and completion information from assigned activities.</p>
+            </div>
+            <a asp-controller="Activities" asp-action="Index" class="btn btn-outline-primary btn-sm">Open practice</a>
+        </div>
+        @if (Model.PracticeActivities.Count == 0)
+        {
+            <p class="learner-empty-state">No practice activity attempts are available yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table progress-table align-middle">
+                    <caption class="visually-hidden">Practice activity attempts, completions, and recorded accuracy</caption>
+                    <thead><tr><th scope="col">Activity</th><th scope="col">Attempts</th><th scope="col">Completed</th><th scope="col">Average accuracy</th><th scope="col">Last activity</th></tr></thead>
+                    <tbody>
+                    @foreach (var activity in Model.PracticeActivities)
+                    {
+                        <tr>
+                            <th scope="row">@activity.ActivityName</th>
+                            <td>@activity.AttemptCount</td>
+                            <td>@activity.CompletedAttemptCount</td>
+                            <td>@(activity.AverageAccuracy is { } accuracy ? $"{accuracy:0.#}%" : "Not available")</td>
+                            <td>@(activity.LastAttemptAtUtc is { } last ? last.ToLocalTime().ToString("d") : "Not available")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="progress-section" aria-labelledby="accuracy-heading">
+        <h2 id="accuracy-heading">Practice accuracy trend</h2>
+        <p class="text-secondary">Only attempts with a stored accuracy value are included.</p>
+        @if (Model.AccuracyTrend.Count == 0)
+        {
+            <p class="learner-empty-state">Accuracy trends will appear after a practice activity records an accuracy value.</p>
+        }
+        else
+        {
+            <figure class="progress-chart" aria-labelledby="accuracy-chart-caption">
+                <figcaption id="accuracy-chart-caption">Average recorded practice accuracy by day</figcaption>
+                <div class="progress-chart-bars">
+                @foreach (var point in Model.AccuracyTrend)
+                {
+                    var accuracyWidth = Math.Clamp(point.AverageAccuracy, 0, 100);
+                    <div class="progress-chart-row">
+                        <span class="progress-chart-label">@point.DateUtc.ToLocalTime().ToString("d")</span>
+                        <div class="progress-chart-track" aria-hidden="true"><span style="width: @accuracyWidth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                        <span class="progress-chart-value">@point.AverageAccuracy.ToString("0.#")%</span>
+                    </div>
+                }
+                </div>
+            </figure>
+        }
+    </section>
+
+    <section class="progress-section" aria-labelledby="frequency-heading">
+        <h2 id="frequency-heading">Activity frequency</h2>
+        <p class="text-secondary">Number of recorded practice attempts on each active day.</p>
+        @if (Model.ActivityFrequency.Count == 0)
+        {
+            <p class="learner-empty-state">Activity frequency will appear after you start an assigned practice activity.</p>
+        }
+        else
+        {
+            <figure class="progress-chart" aria-labelledby="frequency-chart-caption">
+                <figcaption id="frequency-chart-caption">Recorded practice attempts by day</figcaption>
+                <div class="progress-chart-bars">
+                @foreach (var point in Model.ActivityFrequency)
+                {
+                    var frequencyWidth = point.ActivityCount * 100d / maxFrequency;
+                    <div class="progress-chart-row">
+                        <span class="progress-chart-label">@point.DateUtc.ToLocalTime().ToString("d")</span>
+                        <div class="progress-chart-track" aria-hidden="true"><span style="width: @frequencyWidth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></span></div>
+                        <span class="progress-chart-value">@point.ActivityCount</span>
+                    </div>
+                }
+                </div>
+            </figure>
+        }
+    </section>
+
+    <section class="progress-section" aria-labelledby="skills-heading">
+        <h2 id="skills-heading">Target skill areas</h2>
+        <p class="text-secondary">Stored skill-area summaries from completed screening reports.</p>
+        @if (Model.TargetSkillAreas.Count == 0)
+        {
+            <p class="learner-empty-state">Target skill areas will appear when a completed screening report includes them.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table progress-table align-middle">
+                    <caption class="visually-hidden">Stored target skill-area summaries and changes between available observations</caption>
+                    <thead><tr><th scope="col">Skill area</th><th scope="col">Latest stored score</th><th scope="col">Change from previous stored score</th><th scope="col">Observations</th><th scope="col">Support flag</th></tr></thead>
+                    <tbody>
+                    @foreach (var area in Model.TargetSkillAreas)
+                    {
+                        <tr>
+                            <th scope="row">@area.Name</th>
+                            <td>@(area.LatestPercentage is { } latest ? $"{latest:0.#}%" : "Not available")</td>
+                            <td>@(area.ChangePercentagePoints is { } change ? $"{change:+0.#;-0.#;0} percentage points" : "Not available")</td>
+                            <td>@area.ObservationCount</td>
+                            <td>@(area.IsFlaggedForSupport ? "Review support information" : "No flag recorded")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</section>

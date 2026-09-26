@@ -1,0 +1,71 @@
+@model LexiAssist.Web.ViewModels.Referrals.PsychologistReferralsIndexViewModel
+@{
+    ViewData["Title"] = "Assigned referrals";
+}
+
+<div class="mb-4">
+    <p class="auth-eyebrow">Psychologist workspace</p>
+    <h1 class="h2 mb-1">Assigned referrals</h1>
+    <p class="text-secondary mb-0">Only referrals assigned to your account are shown here.</p>
+</div>
+
+<div class="mb-3">
+    <a asp-action="ErrorAnalytics" class="btn btn-outline-primary">Screening error category analytics</a>
+</div>
+
+<div class="table-responsive bg-white border rounded-3">
+    <table class="table table-hover align-middle mb-0">
+        <caption class="visually-hidden">Referrals assigned to the current psychologist</caption>
+        <thead class="table-light">
+            <tr><th scope="col">Learner</th><th scope="col">Created (UTC)</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
+        </thead>
+        <tbody>
+        @if (Model.Referrals.Count == 0)
+        {
+            <tr><td colspan="4" class="text-center text-secondary py-4">There are no referrals assigned to you yet.</td></tr>
+        }
+        else
+        {
+            @foreach (var referral in Model.Referrals)
+            {
+                <tr>
+                    <td class="fw-semibold">@referral.LearnerName</td>
+                    <td>@referral.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>@referral.Status</td>
+                    <td class="text-end"><a asp-action="Details" asp-route-id="@referral.Id" class="btn btn-sm btn-outline-primary">Review</a></td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+    <span class="small text-secondary">@Model.TotalCount assigned referral(s)</span>
+    @if (Model.TotalPages > 1)
+    {
+        <nav aria-label="Assigned referral pages">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(!Model.HasPreviousPage ? "disabled" : "")">
+                    @if (Model.HasPreviousPage)
+                    {
+                        <a class="page-link" asp-action="Index" asp-route-page="@(Model.PageNumber - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <span class="page-link" aria-disabled="true">Previous</span>
+                    }
+                <li class="page-item disabled"><span class="page-link">Page @Model.PageNumber of @Model.TotalPages</span></li>
+                <li class="page-item @(!Model.HasNextPage ? "disabled" : "")">
+                    @if (Model.HasNextPage)
+                    {
+                        <a class="page-link" asp-action="Index" asp-route-page="@(Model.PageNumber + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <span class="page-link" aria-disabled="true">Next</span>
+                    }
+            </ul>
+        </nav>
+    }
+</div>

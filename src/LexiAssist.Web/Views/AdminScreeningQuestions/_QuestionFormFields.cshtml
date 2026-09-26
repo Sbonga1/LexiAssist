@@ -1,0 +1,134 @@
+@model LexiAssist.Web.ViewModels.AdminScreeningTests.AdminScreeningQuestionFormViewModel
+
+<div class="mb-3">
+    <label asp-for="Prompt" class="form-label"></label>
+    <textarea asp-for="Prompt" class="form-control" rows="3" autofocus></textarea>
+    <div class="form-text" data-reading-stimulus-help hidden>For Word reading and Non-word reading, enter only the word or made-up word that the learner will see.</div>
+    <span asp-validation-for="Prompt" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3">
+    <label asp-for="QuestionType" class="form-label"></label>
+    <select asp-for="QuestionType" asp-items="Html.GetEnumSelectList<LexiAssist.Web.Models.Screening.ScreeningQuestionType>()" class="form-select" data-question-type-selector></select>
+    <span asp-validation-for="QuestionType" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<fieldset class="mb-3 border rounded p-3">
+    <legend class="fs-6">Learner voice recording</legend>
+    <div class="form-check">
+        <input asp-for="AllowsAudioRecording" class="form-check-input" />
+        <label asp-for="AllowsAudioRecording" class="form-check-label"></label>
+    </div>
+    <p class="form-text mb-0">When enabled, the learner may choose to record a response. Recordings are private and require the learner's consent.</p>
+</fieldset>
+
+<div class="mb-3 question-type-fields" data-question-types="1,5,12,13" hidden>
+    <label asp-for="ChoiceOptionsText" class="form-label"></label>
+    <textarea asp-for="ChoiceOptionsText" class="form-control" rows="4" aria-describedby="choice-options-help"></textarea>
+    <div id="choice-options-help" class="form-text">Enter one choice per line.</div>
+    <span asp-validation-for="ChoiceOptionsText" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="1,2,3,4,5,7,11,13" hidden>
+    <label asp-for="CorrectAnswer" class="form-label"></label>
+    <input asp-for="CorrectAnswer" class="form-control" />
+    <span asp-validation-for="CorrectAnswer" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="2,3,4,7,8,9,11" hidden>
+    <label asp-for="AcceptedAnswersText" class="form-label"></label>
+    <textarea asp-for="AcceptedAnswersText" class="form-control" rows="4" aria-describedby="accepted-answers-help"></textarea>
+    <div id="accepted-answers-help" class="form-text">Enter one accepted response per line. Leave blank for open responses.</div>
+    <span asp-validation-for="AcceptedAnswersText" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="6,12" hidden>
+    <label asp-for="TimeLimitSeconds" class="form-label"></label>
+    <input asp-for="TimeLimitSeconds" class="form-control" type="number" min="1" max="600" />
+    <span asp-validation-for="TimeLimitSeconds" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="12" hidden>
+    <label asp-for="TimedMatchingReferenceMappingText" class="form-label"></label>
+    <textarea asp-for="TimedMatchingReferenceMappingText" class="form-control" rows="5" aria-describedby="timed-matching-mapping-help"></textarea>
+    <div id="timed-matching-mapping-help" class="form-text">Use original, familiar symbols only. Enter one required pair per line, for example A = ●. The learner sees this reference mapping before matching one item at a time.</div>
+    <span asp-validation-for="TimedMatchingReferenceMappingText" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="12" hidden>
+    <label asp-for="TimedMatchingItemsText" class="form-label"></label>
+    <textarea asp-for="TimedMatchingItemsText" class="form-control" rows="5" aria-describedby="timed-matching-items-help"></textarea>
+    <div id="timed-matching-items-help" class="form-text">List the item labels to show, one per line. Leave blank to use each reference item once.</div>
+    <span asp-validation-for="TimedMatchingItemsText" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="11" hidden>
+    <label asp-for="WorkingMemorySequenceText" class="form-label"></label>
+    <textarea asp-for="WorkingMemorySequenceText" class="form-control" rows="5" aria-describedby="working-memory-sequence-help"></textarea>
+    <div id="working-memory-sequence-help" class="form-text">Use original/demo items only. The learner will see these briefly and then type the sequence from memory.</div>
+    <span asp-validation-for="WorkingMemorySequenceText" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="11" hidden>
+    <label asp-for="MemoryDisplayDurationMilliseconds" class="form-label"></label>
+    <input asp-for="MemoryDisplayDurationMilliseconds" class="form-control" type="number" min="1000" max="30000" />
+    <div class="form-text">This is activity timing only; it is not a diagnostic threshold.</div>
+    <span asp-validation-for="MemoryDisplayDurationMilliseconds" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="13" hidden>
+    <label asp-for="PatternDifficultyLevel" class="form-label"></label>
+    <input asp-for="PatternDifficultyLevel" class="form-control" type="number" min="1" max="5" />
+    <div class="form-text">Optional planning metadata for original activities only. It is not an intelligence or diagnostic score.</div>
+    <span asp-validation-for="PatternDifficultyLevel" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="6" hidden>
+    <label asp-for="TimedNamingItemsText" class="form-label"></label>
+    <textarea asp-for="TimedNamingItemsText" class="form-control" rows="8" aria-describedby="timed-naming-items-help"></textarea>
+    <div id="timed-naming-items-help" class="form-text">Enter exactly 20 symbols, letters, numbers, or familiar words. Repeats are allowed; one item per line.</div>
+    <span asp-validation-for="TimedNamingItemsText" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="8,10" hidden>
+    <label asp-for="PassageText" class="form-label"></label>
+    <textarea asp-for="PassageText" class="form-control" rows="8" aria-describedby="passage-text-help"></textarea>
+    <div id="passage-text-help" class="form-text">Enter the passage and one related question. For more questions on this passage, add more Reading comprehension questions with the same passage under this screening test. Reading fluency uses its own timed activity.</div>
+    <span asp-validation-for="PassageText" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="10" hidden>
+    <label asp-for="ReferenceWordCount" class="form-label"></label>
+    <input asp-for="ReferenceWordCount" class="form-control" type="number" min="1" max="10000" />
+    <div class="form-text">Leave blank to estimate the passage word count from its text.</div>
+    <span asp-validation-for="ReferenceWordCount" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="10" hidden>
+    <label asp-for="TargetWordsPerMinute" class="form-label"></label>
+    <input asp-for="TargetWordsPerMinute" class="form-control" type="number" min="1" max="1000" aria-describedby="target-pace-help" />
+    <div id="target-pace-help" class="form-text">Optional planning metadata only; this is not a diagnostic threshold.</div>
+    <span asp-validation-for="TargetWordsPerMinute" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="9" hidden>
+    <label asp-for="MaxAudioReplays" class="form-label"></label>
+    <input asp-for="MaxAudioReplays" class="form-control" type="number" min="0" max="20" />
+    <div class="form-text">Leave blank for unlimited replay, the learner-friendly default. This is the number of extra listens after the first play.</div>
+    <span asp-validation-for="MaxAudioReplays" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="3,4,9" hidden>
+    <label asp-for="AudioPath" class="form-label"></label>
+    <input asp-for="AudioPath" class="form-control" aria-describedby="audio-path-help" />
+    <div id="audio-path-help" class="form-text">For Listening comprehension, place the audio file in App_Data/ScreeningAudio and enter its file name. Supported formats: MP3, WAV, OGG, M4A, AAC, and WebM. Folder paths and external URLs are not allowed.</div>
+    <span asp-validation-for="AudioPath" aria-live="polite" class="text-danger small"></span>
+</div>
+
+<div class="mb-3 question-type-fields" data-question-types="1,5,6,13" hidden>
+    <label asp-for="ImagePath" class="form-label"></label>
+    <input asp-for="ImagePath" class="form-control" aria-describedby="image-path-help" />
+    <div id="image-path-help" class="form-text">Enter an existing application path or URL. File upload is not available here.</div>
+    <span asp-validation-for="ImagePath" aria-live="polite" class="text-danger small"></span>
+</div>
+

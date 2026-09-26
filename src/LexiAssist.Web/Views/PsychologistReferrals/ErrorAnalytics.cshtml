@@ -1,0 +1,42 @@
+@model LexiAssist.Web.ViewModels.Referrals.PsychologistErrorAnalyticsViewModel
+@{
+    ViewData["Title"] = "Screening error category analytics";
+}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <p class="auth-eyebrow">Psychologist workspace · Assigned referrals</p>
+        <h1 class="h2 mb-1">Screening error category analytics</h1>
+        <p class="text-secondary mb-0">Descriptive counts from responses you are authorized to review.</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary">Back to assigned referrals</a>
+</div>
+
+<div class="alert alert-info" role="note">
+    These categories are descriptive professional tags, not automated clinical interpretations. Rates use distinct responses that have at least one error category tag as the denominator. Untagged responses are unknown, not error-free; because responses may have multiple tags, category rates can add up to more than 100%.
+</div>
+
+@if (Model.ClassifiedResponseCount == 0)
+{
+    <p class="text-secondary">No assigned screening responses have been tagged with an error category yet. Counts and rates will appear after a Psychologist classifies responses.</p>
+}
+else
+{
+    <p><strong>@Model.ClassifiedResponseCount</strong> distinct tagged response(s) in your assigned referrals.</p>
+    <div class="table-responsive bg-white border rounded-3">
+        <table class="table align-middle mb-0">
+            <caption class="visually-hidden">Screening error category counts and rates</caption>
+            <thead class="table-light"><tr><th scope="col">Error category</th><th scope="col">Responses tagged</th><th scope="col">Rate among tagged responses</th></tr></thead>
+            <tbody>
+            @foreach (var category in Model.Categories)
+            {
+                <tr>
+                    <th scope="row">@category.CategoryName</th>
+                    <td>@category.ResponseCount</td>
+                    <td>@(category.RatePercent.HasValue ? $"{category.RatePercent.Value:0.#}%" : "Not available")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

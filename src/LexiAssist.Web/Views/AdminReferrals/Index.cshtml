@@ -1,0 +1,173 @@
+@using LexiAssist.Web.Models.Referrals
+@using LexiAssist.Web.Services
+@model LexiAssist.Web.ViewModels.Referrals.AdminReferralsIndexViewModel
+@{
+    ViewData["Title"] = "Referrals";
+    var searchQuery = Uri.EscapeDataString(Model.SearchLearner ?? string.Empty);
+    var statusQuery = Uri.EscapeDataString(Model.StatusFilter?.ToString() ?? string.Empty);
+}
+
+<section class="admin-referrals-page" aria-labelledby="referrals-heading">
+    <header class="admin-referrals-heading">
+        <p class="auth-eyebrow">Administration</p>
+        <h1 id="referrals-heading">Referral workflow</h1>
+        <p class="admin-referrals-intro">Review support referrals and assign them to an active Psychologist.</p>
+    </header>
+
+    <form method="get" class="admin-referrals-filter" aria-label="Filter referrals">
+        <div class="admin-referrals-search">
+            <label class="form-label" for="search-learner">Search learner</label>
+            <div class="admin-referrals-search-control">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="10.8" cy="10.8" r="6.3" />
+                    <path d="m15.5 15.5 4.2 4.2" />
+                </svg>
+                <input id="search-learner" name="search" value="@Model.SearchLearner" class="form-control" maxlength="100" placeholder="Name or email" />
+            </div>
+        </div>
+        <div class="admin-referrals-status-filter">
+            <label class="form-label" for="referral-status">Status</label>
+            <select id="referral-status" name="status" class="form-select">
+                <option value="" selected="@(!Model.StatusFilter.HasValue ? "selected" : null)">All statuses</option>
+                @foreach (var status in Enum.GetValues<ReferralStatus>())
+                {
+                    var statusLabel = status switch
+                    {
+                        ReferralStatus.UnderReview => "Under review",
+                        ReferralStatus.FollowUpRequested => "Follow-up requested",
+                        _ => status.ToString()
+                    };
+                    <option value="@status" selected="@(Model.StatusFilter == status ? "selected" : null)">@statusLabel</option>
+                }
+            </select>
+        </div>
+        <div class="admin-referrals-filter-actions">
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Clear</a>
+        </div>
+    </form>
+
+    @if (Model.Referrals.Count == 0)
+    {
+        <div class="admin-referrals-empty" role="status">
+            <strong>No referrals match your current filters.</strong>
+            <span>Try a different learner search or clear the filters to view all referrals.</span>
+            <a asp-action="Index" class="btn btn-outline-secondary">Clear filters</a>
+        </div>
+    }
+    else
+    {
+        <div class="admin-referrals-table-surface">
+            <div class="admin-referrals-table-wrap">
+                <table class="table admin-referrals-table mb-0">
+                    <caption class="visually-hidden">Referral workflow records</caption>
+                    <colgroup>
+                        <col class="admin-referrals-col-learner" />
+                        <col class="admin-referrals-col-created" />
+                        <col class="admin-referrals-col-status" />
+                        <col class="admin-referrals-col-psychologist" />
+                        <col class="admin-referrals-col-actions" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">Learner</th>
+                            <th scope="col">Created (CAT)</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Assigned Psychologist</th>
+                            <th scope="col" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var referral in Model.Referrals)
+                    {
+                        var catParts = SouthAfricaTimeFormatter.Format(referral.CreatedAtUtc).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        var catTime = catParts.ElementAtOrDefault(1) ?? string.Empty;
+                        var catDisplay = catTime.Length >= 5
+                            ? $"{catParts.ElementAtOrDefault(0)} {catTime[..5]} CAT"
+                            : SouthAfricaTimeFormatter.Format(referral.CreatedAtUtc);
+                        var statusLabel = referral.Status switch
+                        {
+                            ReferralStatus.UnderReview => "Under review",
+                            ReferralStatus.FollowUpRequested => "Follow-up requested",
+                            _ => referral.Status.ToString()
+                        };
+                        var statusClass = referral.Status switch
+                        {
+                            ReferralStatus.Pending => "is-pending",
+                            ReferralStatus.Assigned => "is-assigned",
+                            ReferralStatus.UnderReview => "is-under-review",
+                            ReferralStatus.Closed => "is-closed",
+                            _ => "is-neutral"
+                        };
+                        <tr class="admin-referrals-row">
+                            <td class="admin-referrals-learner">
+                                <span class="admin-referrals-learner-name">@referral.LearnerName</span>
+                                @if (!string.IsNullOrWhiteSpace(referral.LearnerEmail))
+                                {
+                                    <span class="admin-referrals-learner-email">@referral.LearnerEmail</span>
+                                }
+                            </td>
+                            <td>
+                                <time class="admin-referrals-created" datetime="@referral.CreatedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@catDisplay</time>
+                            </td>
+                            <td>
+                                <span class="admin-referrals-status-badge @statusClass">
+                                    <span class="admin-referrals-status-dot" aria-hidden="true"></span>
+                                    @statusLabel
+                                </span>
+                            </td>
+                            <td class="@(referral.AssignedPsychologistName is null ? "admin-referrals-unassigned" : string.Empty)">@(referral.AssignedPsychologistName ?? "Unassigned")</td>
+                            <td>
+                                <div class="admin-referrals-actions">
+                                    <a asp-action="Details" asp-route-id="@referral.Id" class="btn btn-sm btn-outline-secondary">Open</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="admin-referrals-table-footer">
+                <p class="admin-referrals-summary">Showing @Model.FirstItemNumber–@Model.LastItemNumber of @Model.TotalCount referrals</p>
+                <nav aria-label="Referral pages">
+                    <ul class="pagination admin-referrals-pagination mb-0">
+                        <li class="page-item @(!Model.HasPreviousPage ? "disabled" : string.Empty)">
+                            @if (Model.HasPreviousPage)
+                            {
+                                <a class="page-link" href="?search=@searchQuery&amp;status=@statusQuery&amp;page=@(Model.PageNumber - 1)">Previous</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Previous</span>
+                            }
+                        </li>
+                        @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+                        {
+                            <li class="page-item @(pageNumber == Model.PageNumber ? "active" : string.Empty)">
+                                @if (pageNumber == Model.PageNumber)
+                                {
+                                    <span class="page-link" aria-current="page">@pageNumber</span>
+                                }
+                                else
+                                {
+                                    <a class="page-link" href="?search=@searchQuery&amp;status=@statusQuery&amp;page=@pageNumber">@pageNumber</a>
+                                }
+                            </li>
+                        }
+                        <li class="page-item @(!Model.HasNextPage ? "disabled" : string.Empty)">
+                            @if (Model.HasNextPage)
+                            {
+                                <a class="page-link" href="?search=@searchQuery&amp;status=@statusQuery&amp;page=@(Model.PageNumber + 1)">Next</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Next</span>
+                            }
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    }
+</section>

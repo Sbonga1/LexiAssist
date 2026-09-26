@@ -1,0 +1,18 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Something went wrong";
+}
+
+<section class="auth-page" aria-labelledby="error-heading">
+    <div class="auth-card text-center">
+        <div class="auth-brand-mark mx-auto" aria-hidden="true">L</div>
+        <p class="auth-eyebrow">LexiAssist</p>
+        <h1 id="error-heading" class="auth-title">We couldn't complete that request</h1>
+        <p class="auth-intro">Something unexpected happened. Please try again. If the problem continues, contact your support person.</p>
+        @if (Model.ShowRequestId)
+        {
+            <p class="small text-muted" role="status">Reference: <code>@Model.RequestId</code></p>
+        }
+        <a asp-controller="Home" asp-action="Index" class="btn btn-primary">Return to home</a>
+    </div>
+</section>

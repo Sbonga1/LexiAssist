@@ -1,0 +1,171 @@
+@using LexiAssist.Web.Services
+@model LexiAssist.Web.ViewModels.Resources.EducationalResourcesIndexViewModel
+@{
+    ViewData["Title"] = "Educational resources";
+    var searchQuery = Uri.EscapeDataString(Model.Search ?? string.Empty);
+    var typeQuery = Uri.EscapeDataString(Model.ResourceTypeFilter ?? string.Empty);
+    var statusQuery = Uri.EscapeDataString(Model.StatusFilter ?? string.Empty);
+}
+
+<section class="admin-resources-page" aria-labelledby="resources-heading">
+    <header class="admin-resources-heading">
+        <div>
+            <p class="auth-eyebrow">Administration</p>
+            <h1 id="resources-heading">Educational resources</h1>
+            <p class="admin-resources-intro">Create clear support materials and publish them when they are ready.</p>
+        </div>
+        <a asp-action="Create" class="btn btn-primary admin-resources-create"><span aria-hidden="true">+</span> Create resource</a>
+    </header>
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success admin-resources-status" role="status">@statusMessage</div>
+    }
+
+    <form method="get" class="admin-resources-filter" aria-label="Filter educational resources">
+        <div class="admin-resources-search">
+            <label class="visually-hidden" for="resource-search">Search resources</label>
+            <span class="admin-resources-search-icon" aria-hidden="true">⌕</span>
+            <input id="resource-search" class="form-control" name="search" value="@Model.Search" maxlength="200" placeholder="Search resources by title or description..." />
+        </div>
+        <div>
+            <label class="visually-hidden" for="resource-type">Resource type</label>
+            <select id="resource-type" class="form-select" name="type">
+                <option value="" selected="@(string.IsNullOrWhiteSpace(Model.ResourceTypeFilter) ? "selected" : null)">All types</option>
+                @foreach (var resourceType in Model.ResourceTypes)
+                {
+                    <option value="@resourceType" selected="@(string.Equals(Model.ResourceTypeFilter, resourceType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@resourceType</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="visually-hidden" for="resource-status">Resource status</label>
+            <select id="resource-status" class="form-select" name="status">
+                <option value="" selected="@(string.IsNullOrWhiteSpace(Model.StatusFilter) ? "selected" : null)">All statuses</option>
+                <option value="draft" selected="@(Model.StatusFilter == "draft" ? "selected" : null)">Draft</option>
+                <option value="published" selected="@(Model.StatusFilter == "published" ? "selected" : null)">Published</option>
+            </select>
+        </div>
+        <div class="admin-resources-filter-actions">
+            <button type="submit" class="btn btn-primary">Search</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Clear</a>
+        </div>
+    </form>
+
+    @if (Model.Resources.Count == 0)
+    {
+        <div class="admin-resources-empty" role="status">
+            <strong>No resources match your current filters.</strong>
+            <span>Try a different search or clear the filters to view all resources.</span>
+            <a asp-action="Index" class="btn btn-outline-secondary">Clear filters</a>
+        </div>
+    }
+    else
+    {
+        <div class="admin-resources-table-surface">
+            <div class="admin-resources-table-wrap">
+                <table class="table admin-resources-table mb-0">
+                    <caption class="visually-hidden">Educational resources</caption>
+                    <colgroup>
+                        <col class="admin-resources-col-title" />
+                        <col class="admin-resources-col-type" />
+                        <col class="admin-resources-col-status" />
+                        <col class="admin-resources-col-updated" />
+                        <col class="admin-resources-col-actions" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">Title</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Updated</th>
+                            <th scope="col" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var resource in Model.Resources)
+                    {
+                        var updatedAtCat = SouthAfricaTimeFormatter.Format(resource.UpdatedAtUtc);
+                        var updatedDate = (updatedAtCat.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "—").Replace('-', '/');
+                        <tr class="admin-resources-row">
+                            <td>
+                                <div class="admin-resources-title">@resource.Title</div>
+                                <div class="admin-resources-summary">@resource.Summary</div>
+                            </td>
+                            <td>@resource.ResourceType</td>
+                            <td>
+                                <span class="admin-resources-status-badge @(resource.IsPublished ? "is-published" : "is-draft")">
+                                    <span class="admin-resources-status-dot" aria-hidden="true"></span>
+                                    @(resource.IsPublished ? "Published" : "Draft")
+                                </span>
+                            </td>
+                            <td><time datetime="@resource.UpdatedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@updatedDate</time></td>
+                            <td>
+                                <div class="admin-resources-actions">
+                                    <a asp-action="Details" asp-route-id="@resource.Id" class="btn btn-sm btn-outline-secondary">View</a>
+                                    <a asp-action="Edit" asp-route-id="@resource.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    @if (resource.IsPublished)
+                                    {
+                                        <form asp-action="Unpublish" asp-route-id="@resource.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Unpublish</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="Publish" asp-route-id="@resource.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-success">Publish</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="admin-resources-table-footer">
+                <p class="admin-resources-summary-count">Showing @Model.FirstItemNumber–@Model.LastItemNumber of @Model.TotalItems resources</p>
+                <nav aria-label="Educational resource pages">
+                    <ul class="pagination admin-resources-pagination mb-0">
+                        <li class="page-item @(!Model.HasPreviousPage ? "disabled" : string.Empty)">
+                            @if (Model.HasPreviousPage)
+                            {
+                                <a class="page-link" href="?search=@searchQuery&amp;type=@typeQuery&amp;status=@statusQuery&amp;page=@(Model.CurrentPage - 1)">Previous</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Previous</span>
+                            }
+                        </li>
+                        @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+                        {
+                            <li class="page-item @(pageNumber == Model.CurrentPage ? "active" : string.Empty)">
+                                @if (pageNumber == Model.CurrentPage)
+                                {
+                                    <span class="page-link" aria-current="page">@pageNumber</span>
+                                }
+                                else
+                                {
+                                    <a class="page-link" href="?search=@searchQuery&amp;type=@typeQuery&amp;status=@statusQuery&amp;page=@pageNumber">@pageNumber</a>
+                                }
+                            </li>
+                        }
+                        <li class="page-item @(!Model.HasNextPage ? "disabled" : string.Empty)">
+                            @if (Model.HasNextPage)
+                            {
+                                <a class="page-link" href="?search=@searchQuery&amp;type=@typeQuery&amp;status=@statusQuery&amp;page=@(Model.CurrentPage + 1)">Next</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Next</span>
+                            }
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    }
+</section>

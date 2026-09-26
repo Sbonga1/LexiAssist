@@ -1,0 +1,96 @@
+@model LexiAssist.Web.ViewModels.Referrals.PsychologistReferralDetailsViewModel
+@{
+    ViewData["Title"] = "Review referral";
+}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <p class="auth-eyebrow">Psychologist workspace · Referral</p>
+        <h1 class="h2 mb-1">@Model.LearnerName</h1>
+        <p class="text-secondary mb-0">@Model.LearnerEmail</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-controller="ActivityAssignments" asp-action="Create" asp-route-reportId="@Model.ScreeningReportId" class="btn btn-outline-primary">Activity recommendations and assignment</a>
+        <a asp-action="DataPassport" asp-route-id="@Model.Id" class="btn btn-primary">Open Diagnostic Data Passport</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to assigned referrals</a>
+    </div>
+</div>
+
+<div class="alert alert-info" role="note">This report is educational screening information, not a clinical diagnosis. Review it alongside your professional judgment and the learner’s broader context.</div>
+@if (TempData["StatusMessage"] is string statusMessage)
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+
+<section class="admin-details-card mb-4" aria-labelledby="screening-summary-heading">
+    <h2 id="screening-summary-heading" class="h4">Screening summary</h2>
+    <dl class="row">
+        <dt class="col-sm-4">Referral status</dt><dd class="col-sm-8">@Model.Status</dd>
+        <dt class="col-sm-4">Support tier</dt><dd class="col-sm-8">@(Model.RiskTier ?? "Not classified")</dd>
+        <dt class="col-sm-4">Created (UTC)</dt><dd class="col-sm-8">@Model.CreatedAtUtc.ToString("u")</dd>
+        <dt class="col-sm-4">First reviewed (UTC)</dt><dd class="col-sm-8">@(Model.ReviewedAtUtc?.ToString("u") ?? "Not reviewed")</dd>
+    </dl>
+    <p>@Model.ReportSummary</p>
+</section>
+
+<section class="mb-4" aria-labelledby="category-results-heading">
+    <h2 id="category-results-heading" class="h4 mb-3">Screening category results</h2>
+    @if (Model.SkillAreas.Count == 0)
+    {
+        <p class="text-secondary">Category results were not stored in this report snapshot.</p>
+    }
+    else
+    {
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Screening category results for this referral</caption>
+                <thead class="table-light"><tr><th scope="col">Category</th><th scope="col">Available score</th><th scope="col">Summary</th><th scope="col">Indicator</th></tr></thead>
+                <tbody>
+                @foreach (var area in Model.SkillAreas)
+                {
+                    <tr>
+                        <th scope="row">@area.Name</th>
+                        <td>@(area.PercentageScore.HasValue ? $"{area.PercentageScore.Value:0.#}%" : "Not available")</td>
+                        <td>@area.Summary</td>
+                        <td>@(area.IsFlaggedForSupport ? "Support review area" : area.IsStrength ? "Strength" : "No specific indicator")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section class="admin-details-card" aria-labelledby="review-heading">
+    <h2 id="review-heading" class="h4">Professional review</h2>
+    @if (Model.IsFinal)
+    {
+        <p><strong>Status:</strong> @Model.Status</p>
+        <h3 class="h6">Professional notes</h3>
+        <p class="mb-0">@(string.IsNullOrWhiteSpace(Model.Notes) ? "No notes recorded." : Model.Notes)</p>
+    }
+    else
+    {
+        <form asp-action="Review" asp-route-id="@Model.Id" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+            <div class="mb-3">
+                <label for="Status" class="form-label">Workflow status</label>
+                <select id="Status" name="Status" class="form-select" required>
+                    @foreach (var status in Model.AllowedStatuses)
+                    {
+                        <option value="@status" selected="@(Model.Status == status)">@status</option>
+                    }
+                </select>
+                <span class="text-danger">@Html.ValidationMessage("Status")</span>
+            </div>
+            <div class="mb-3">
+                <label for="Notes" class="form-label">Professional notes</label>
+                <textarea id="Notes" name="Notes" class="form-control" rows="5" maxlength="4000">@Model.Notes</textarea>
+                <div class="form-text">These notes are available to authorized administrators and the assigned Psychologist. Learners cannot view or edit them.</div>
+                <span class="text-danger">@Html.ValidationMessage("Notes")</span>
+            </div>
+            <button type="submit" class="btn btn-primary">Save review</button>
+        </form>
+    }
+</section>

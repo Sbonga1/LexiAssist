@@ -1,0 +1,89 @@
+@model LexiAssist.Web.ViewModels.AdminScreeningReports.AdminScreeningReportDetailsViewModel
+@{
+    ViewData["Title"] = "Screening report";
+}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <p class="auth-eyebrow">Administration · Completed report</p>
+        <h1 class="h2 mb-1">@Model.LearnerName</h1>
+        <p class="text-secondary mb-0">@Model.LearnerEmail · Generated @Model.GeneratedAtUtc.ToString("u")</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-controller="ActivityAssignments" asp-action="Create" asp-route-reportId="@Model.Id" class="btn btn-primary">Activity recommendations and assignment</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to reports</a>
+    </div>
+</div>
+
+<div class="alert alert-info" role="note">
+    This is an educational screening and support summary. It is not a clinical diagnosis. The information below is the saved report snapshot from the time it was generated.
+</div>
+
+<section class="admin-details-card mb-4" aria-labelledby="summary-heading">
+    <h2 id="summary-heading" class="h4">Screening summary</h2>
+    <p>@Model.Summary</p>
+    <dl class="row mb-0">
+        <dt class="col-sm-4">Support tier</dt>
+        <dd class="col-sm-8">@(string.IsNullOrWhiteSpace(Model.RiskTier) ? "Not classified" : Model.RiskTier)</dd>
+        <dt class="col-sm-4">Recommended next action</dt>
+        <dd class="col-sm-8">@Model.RecommendedNextAction</dd>
+        <dt class="col-sm-4">Professional follow-up</dt>
+        <dd class="col-sm-8">@(Model.IsReferralRecommended ? "Recommended" : "Not specifically recommended")</dd>
+        <dt class="col-sm-4">Scoring configuration</dt>
+        <dd class="col-sm-8">@Model.ScoringVersion</dd>
+    </dl>
+</section>
+
+<section aria-labelledby="category-results-heading">
+    <h2 id="category-results-heading" class="h4 mb-3">Screening category results</h2>
+    @if (Model.SkillAreas.Count == 0)
+    {
+        <p class="text-secondary">Category results were not stored in this report snapshot.</p>
+    }
+    else
+    {
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Screening category results</caption>
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Category</th>
+                        <th scope="col">Available score</th>
+                        <th scope="col">Summary</th>
+                        <th scope="col">Indicator</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var area in Model.SkillAreas)
+                {
+                    <tr>
+                        <th scope="row">@area.Name</th>
+                        <td>@(area.PercentageScore.HasValue ? $"{area.PercentageScore.Value:0.#}%" : "Not available")</td>
+                        <td>@area.Summary</td>
+                        <td>
+                            @if (area.IsFlaggedForSupport)
+                            {
+                                <span class="badge text-bg-warning">Support review area</span>
+                            }
+                            else if (area.IsStrength)
+                            {
+                                <span class="badge text-bg-success">Strength</span>
+                            }
+                            else
+                            {
+                                <span class="text-secondary">No specific indicator</span>
+                            }
+                        </td>
+                    </tr>
+                    @if (area.ActivityMetrics.Count > 0)
+                    {
+                        <tr>
+                            <td colspan="4"><partial name="_ScreeningActivityMetrics" model="area.ActivityMetrics" /></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

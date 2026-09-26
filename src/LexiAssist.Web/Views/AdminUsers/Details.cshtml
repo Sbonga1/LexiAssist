@@ -1,0 +1,174 @@
+@model LexiAssist.Web.ViewModels.AdminUsers.AdminUserDetailsViewModel
+@using System.Globalization
+@using LexiAssist.Web.Models.Identity
+@using LexiAssist.Web.Services
+@{
+    ViewData["Title"] = "User details";
+    var displayName = $"{Model.FirstName} {Model.LastName}".Trim();
+    if (string.IsNullOrWhiteSpace(displayName))
+    {
+        displayName = string.IsNullOrWhiteSpace(Model.PreferredName) ? Model.Email : Model.PreferredName;
+    }
+
+    var initials = string.Concat(new[] { Model.FirstName, Model.LastName }
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value.Trim()[0]))
+        .ToUpperInvariant();
+    if (string.IsNullOrWhiteSpace(initials))
+    {
+        initials = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(value => value.Length > 0)
+            .Take(2)
+            .Select(value => value[0])
+            .ToArray() is { Length: > 0 } fallbackInitials
+            ? new string(fallbackInitials).ToUpperInvariant()
+            : "?";
+    }
+
+    var roleLabel = Model.Roles.Count == 0 ? "No role assigned" : string.Join(", ", Model.Roles);
+    var roleClass = Model.Roles.Any(role => string.Equals(role, ApplicationRoles.Administrator, StringComparison.OrdinalIgnoreCase))
+        ? "administrator"
+        : Model.Roles.Any(role => string.Equals(role, ApplicationRoles.Psychologist, StringComparison.OrdinalIgnoreCase))
+            ? "psychologist"
+            : Model.Roles.Any(role => string.Equals(role, ApplicationRoles.Learner, StringComparison.OrdinalIgnoreCase))
+                ? "learner"
+                : "neutral";
+}
+
+<section class="admin-user-details-page" aria-labelledby="admin-user-details-heading">
+    <a asp-action="Index" class="admin-user-details-breadcrumb">
+        <span aria-hidden="true">←</span>
+        <span>Back to users</span>
+    </a>
+
+    <header class="admin-user-details-heading">
+        <div class="admin-user-details-identity">
+            <span class="admin-user-details-avatar" aria-hidden="true">@initials</span>
+            <div class="admin-user-details-heading-copy">
+                <p class="auth-eyebrow">Administration</p>
+                <h1 id="admin-user-details-heading">@displayName</h1>
+                <div class="admin-user-details-contact">
+                    <p class="admin-user-details-email">@Model.Email</p>
+                    <span class="admin-user-details-status-badge @(Model.IsActive ? "is-active" : "is-inactive")">
+                        <span class="admin-user-details-status-dot" aria-hidden="true"></span>
+                        @(Model.IsActive ? "Active" : "Inactive")
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="admin-user-details-actions">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="admin-user-details-secondary-action">
+                <svg class="admin-user-details-action-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                    <path d="m14.5 6.5 3 3M5 19l3.7-.8L18.7 8.2a2.1 2.1 0 0 0-3-3L5.7 15.2 5 19Z" />
+                </svg>
+                <span>Edit profile</span>
+            </a>
+            <a asp-action="Index" class="admin-user-details-secondary-action">Back to users</a>
+        </div>
+    </header>
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    <section class="admin-user-details-card" aria-labelledby="admin-user-details-summary">
+        <div class="admin-user-details-card-heading">
+            <span class="admin-user-details-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8-1a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM3.8 19a4.2 4.2 0 0 1 8.4 0M13.2 19a3.8 3.8 0 0 1 7.6 0" />
+                </svg>
+            </span>
+            <div>
+                <h2 id="admin-user-details-summary">User information</h2>
+                <p>Key details for this user account.</p>
+            </div>
+        </div>
+
+        <dl class="admin-user-details-grid">
+            <div class="admin-user-details-row">
+                <dt>Preferred name</dt>
+                <dd>@(string.IsNullOrWhiteSpace(Model.PreferredName) ? "Not provided" : Model.PreferredName)</dd>
+            </div>
+            <div class="admin-user-details-row">
+                <dt>Date of birth</dt>
+                <dd>@(Model.DateOfBirth?.ToString("d MMMM yyyy", CultureInfo.InvariantCulture) ?? "Not provided")</dd>
+            </div>
+            <div class="admin-user-details-row">
+                <dt>Role(s)</dt>
+                <dd><span class="admin-user-details-role-badge admin-user-details-role-@roleClass">@roleLabel</span></dd>
+            </div>
+            <div class="admin-user-details-row">
+                <dt>Account status</dt>
+                <dd>
+                    <span class="admin-user-details-status-badge @(Model.IsActive ? "is-active" : "is-inactive")">
+                        <span class="admin-user-details-status-dot" aria-hidden="true"></span>
+                        @(Model.IsActive ? "Active" : "Inactive")
+                    </span>
+                </dd>
+            </div>
+            <div class="admin-user-details-row">
+                <dt>Created (CAT)</dt>
+                <dd>@SouthAfricaTimeFormatter.Format(Model.CreatedAtUtc)</dd>
+            </div>
+            <div class="admin-user-details-row">
+                <dt>Screening and privacy notice</dt>
+                <dd>@(SouthAfricaTimeFormatter.Format(Model.ScreeningPrivacyNoticeAcceptedAtUtc) ?? "No acceptance recorded")</dd>
+            </div>
+        </dl>
+    </section>
+
+    <div class="admin-user-details-lower-actions">
+        <div class="admin-user-details-account-action">
+            @if (Model.IsCurrentUser)
+            {
+                <p class="text-secondary">You cannot deactivate the administrator account you are currently using.</p>
+            }
+            else if (Model.IsActive)
+            {
+                <form asp-action="Deactivate" asp-route-id="@Model.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="admin-user-details-danger-action">
+                        <svg class="admin-user-details-action-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                            <path d="M5 7h14M9 7V5h6v2m-8 0 .8 13h6.4L15 7M10 10v7m4-7v7" />
+                        </svg>
+                        <span>Deactivate account</span>
+                    </button>
+                </form>
+            }
+            else
+            {
+                <form asp-action="Activate" asp-route-id="@Model.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="admin-user-details-activate-action">Activate account</button>
+                </form>
+            }
+        </div>
+
+        <nav class="admin-user-details-pager" aria-label="User account navigation">
+            @if (Model.PreviousUserId is { } previousUserId)
+            {
+                <a asp-action="Details" asp-route-id="@previousUserId" class="admin-user-details-pager-button" aria-label="Previous user">‹</a>
+            }
+            else
+            {
+                <button type="button" class="admin-user-details-pager-button" aria-label="Previous user" disabled>‹</button>
+            }
+
+            <span class="admin-user-details-pager-position">User @Model.CurrentPosition of @Model.TotalUsers</span>
+
+            @if (Model.NextUserId is { } nextUserId)
+            {
+                <a asp-action="Details" asp-route-id="@nextUserId" class="admin-user-details-pager-button" aria-label="Next user">›</a>
+            }
+            else
+            {
+                <button type="button" class="admin-user-details-pager-button" aria-label="Next user" disabled>›</button>
+            }
+        </nav>
+    </div>
+</section>

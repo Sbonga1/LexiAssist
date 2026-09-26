@@ -1,0 +1,106 @@
+@using Microsoft.AspNetCore.Identity
+@using LexiAssist.Web.Models.Identity
+@inject SignInManager<ApplicationUser> SignInManager
+@{
+    var isHomePage = string.Equals(ViewContext.RouteData.Values["controller"]?.ToString(), "Home", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(ViewContext.RouteData.Values["action"]?.ToString(), "Index", StringComparison.OrdinalIgnoreCase);
+}
+
+<ul class="navbar-nav site-nav-links me-lg-auto align-items-lg-center gap-lg-1">
+    <li class="nav-item">
+        <a class="nav-link @(isHomePage ? "is-active" : string.Empty)" asp-controller="Home" asp-action="Index" aria-current="@(isHomePage ? "page" : null)">Home</a>
+    </li>
+@if (SignInManager.IsSignedIn(User))
+{
+    @if (User.IsInRole(ApplicationRoles.Administrator))
+    {
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Dashboard" asp-action="Administrator">Dashboard</a>
+        </li>
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="admin-navigation" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+            <ul class="dropdown-menu" aria-labelledby="admin-navigation">
+                <li><a class="dropdown-item" asp-controller="AdminUsers" asp-action="Index">Manage users</a></li>
+                <li><a class="dropdown-item" asp-controller="AdminScreeningTests" asp-action="Index">Screening Tests</a></li>
+                <li><a class="dropdown-item" asp-controller="AdminScreeningReports" asp-action="Index">Screening reports</a></li>
+                <li><a class="dropdown-item" asp-controller="AdminReferrals" asp-action="Index">Referrals</a></li>
+                <li><a class="dropdown-item" asp-controller="AdminEducationalResources" asp-action="Index">Educational resources</a></li>
+                <li><a class="dropdown-item" asp-controller="AdminAudit" asp-action="Index">Audit log</a></li>
+            </ul>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Settings" asp-action="Accessibility">Accessibility settings</a>
+        </li>
+    }
+    else if (User.IsInRole(ApplicationRoles.Psychologist))
+    {
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Dashboard" asp-action="Psychologist">Dashboard</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="PsychologistReferrals" asp-action="Index">Assigned referrals</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="EducationalResources" asp-action="Index">Resources</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Settings" asp-action="Accessibility">Accessibility settings</a>
+        </li>
+    }
+    else if (User.IsInRole(ApplicationRoles.Learner))
+    {
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Dashboard" asp-action="Learner">Dashboard</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Screening" asp-action="Index">Screening</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Activities" asp-action="Index">Practice</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Dashboard" asp-action="Learner" asp-fragment="progress">Progress</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Dashboard" asp-action="Learner" asp-fragment="resources">Resources</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Settings" asp-action="Accessibility">Settings</a>
+        </li>
+    }
+    else
+    {
+        <li class="nav-item">
+            <a class="nav-link" asp-controller="Settings" asp-action="Accessibility">Accessibility settings</a>
+        </li>
+    }
+}
+<li class="nav-item">
+    <a class="nav-link" asp-controller="Home" asp-action="Privacy">Privacy</a>
+</li>
+</ul>
+
+<ul class="navbar-nav account-nav align-items-lg-center gap-lg-1">
+@if (SignInManager.IsSignedIn(User))
+{
+    @await Component.InvokeAsync("NotificationBell")
+    <li class="nav-item">
+        <span class="nav-link account-name">Hello @User.Identity?.Name!</span>
+    </li>
+    <li class="nav-item">
+        <form class="d-inline" asp-controller="Account" asp-action="Logout" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="nav-link btn btn-link">Sign out</button>
+        </form>
+    </li>
+}
+else
+{
+    <li class="nav-item">
+        <a class="nav-link create-account-link" asp-controller="Account" asp-action="Register">Create account</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link sign-in-link" asp-controller="Account" asp-action="Login">Sign in</a>
+    </li>
+}
+</ul>

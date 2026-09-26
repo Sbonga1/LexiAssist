@@ -1,0 +1,117 @@
+@model LexiAssist.Web.ViewModels.Activities.FastNameRaceViewModel
+@{
+    ViewData["Title"] = "Fast Name Race";
+}
+
+<section class="dashboard-page fast-name-race-page" aria-labelledby="fast-name-race-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Practice activity · Naming fluency</p>
+        <h1 id="fast-name-race-heading">Fast Name Race</h1>
+        <p class="learner-dashboard-intro">Name familiar items at a comfortable, steady pace. Accurate naming matters; being quicker does not mean being smarter.</p>
+    </header>
+
+    @if (Model.AudioRecorder is { } audioRecorder)
+    {
+        <partial name="_LearnerAudioRecorder" model="audioRecorder" />
+    }
+
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="status">@errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Message))
+    {
+        <div class="alert alert-warning" role="status">@Model.Message</div>
+    }
+
+    @if (Model.IsCompleted)
+    {
+        <section class="admin-details-card" aria-labelledby="activity-complete-heading">
+            <h2 id="activity-complete-heading" class="h3">Activity complete</h2>
+            <p>Here is a summary of this naming practice session.</p>
+            <dl class="fast-name-race-results">
+                <div><dt>Items completed</dt><dd>@Model.ItemsCompleted of @Model.Items.Count</dd></div>
+                <div><dt>Items marked for correction</dt><dd>@Model.ErrorCount</dd></div>
+                @if (Model.ActiveDurationMilliseconds is { } duration)
+                {
+                    <div><dt>Active practice time</dt><dd>@TimeSpan.FromMilliseconds(duration).ToString(@"m\:ss")</dd></div>
+                }
+                @if (Model.ItemsPerMinute is { } rate)
+                {
+                    <div><dt>Items per active minute</dt><dd>@rate.ToString("0.#")</dd></div>
+                }
+                @if (Model.Accuracy is { } accuracy)
+                {
+                    <div><dt>Items without a marked correction</dt><dd>@accuracy.ToString("0.#")%</dd></div>
+                }
+            </dl>
+            <p>These are simple descriptions of this practice activity. They do not measure intelligence or provide a diagnosis.</p>
+            <a asp-action="Index" class="btn btn-outline-primary">Back to practice activities</a>
+        </section>
+    }
+    else if (Model.CanStart)
+    {
+        <section class="admin-details-card" aria-labelledby="ready-heading">
+            <h2 id="ready-heading" class="h3">Ready when you are</h2>
+            <p>This activity has @Model.Items.Count familiar items and lasts up to @Model.DurationSeconds seconds. Read each highlighted item aloud, then move to the next one. You can pause at any time.</p>
+            <p>Use a comfortable pace. This activity is practice and does not make a diagnosis.</p>
+            <form asp-action="StartFastNameRace" asp-route-assignmentId="@Model.AssignmentId" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Start practice</button>
+            </form>
+        </section>
+    }
+    else if (Model.AttemptId is { } attemptId && Model.Items.Count > 0)
+    {
+        <section class="fast-name-race-run" id="fast-name-race-run" data-duration-seconds="@Model.DurationSeconds" aria-labelledby="run-heading">
+            <h2 id="run-heading" class="h3">Name each highlighted item</h2>
+            <p>Say the current item aloud, mark it if you want to note a correction, and select <strong>Next item</strong>. You may pause whenever you need.</p>
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+            <section class="fast-name-race-controls" aria-labelledby="fast-name-race-status-heading">
+                <h2 id="fast-name-race-status-heading" class="visually-hidden">Activity status</h2>
+                <p class="fast-name-race-clock"><span>Time left</span> <strong id="fast-name-race-clock" role="timer" aria-live="off" aria-atomic="true" aria-label="Time remaining">@Model.DurationSeconds:00</strong></p>
+                <p><span>Items completed</span> <strong id="fast-name-race-count">0 of @Model.Items.Count</strong></p>
+                <progress id="fast-name-race-progress" value="0" max="@Model.Items.Count" aria-label="Items completed">0 of @Model.Items.Count</progress>
+            </section>
+
+            <ol class="fast-name-race-grid" id="fast-name-race-grid" aria-label="Naming items, in randomized order">
+                @for (var index = 0; index < Model.Items.Count; index++)
+                {
+                    <li class="fast-name-race-item" data-item-index="@index" aria-current="@(index == 0 ? "true" : "false")">
+                        <span class="visually-hidden">Item @(index + 1): </span>@Model.Items[index]
+                    </li>
+                }
+            </ol>
+
+            <p id="fast-name-race-current" class="visually-hidden" aria-live="polite">Current item 1 of @Model.Items.Count.</p>
+            <p id="fast-name-race-status" class="fast-name-race-status" role="status" aria-live="polite"></p>
+
+            <form asp-action="FinishFastNameRace" asp-route-assignmentId="@Model.AssignmentId" method="post" id="fast-name-race-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="AttemptId" value="@attemptId" />
+                <input type="hidden" id="fast-name-race-items-completed" name="SubmittedItemsCompleted" value="0" />
+                <input type="hidden" id="fast-name-race-error-indexes" name="ErrorIndexesJson" value="[]" />
+                <input type="hidden" id="fast-name-race-duration" name="SubmittedActiveDurationMilliseconds" value="0" />
+                <div class="fast-name-race-actions">
+                    <button type="button" id="fast-name-race-mark-error" class="btn btn-outline-secondary" aria-pressed="false">Mark this item for correction</button>
+                    <button type="button" id="fast-name-race-next" class="btn btn-primary">Next item</button>
+                    <button type="button" id="fast-name-race-pause" class="btn btn-outline-primary">Pause</button>
+                    <button type="button" id="fast-name-race-resume" class="btn btn-outline-primary" hidden>Resume</button>
+                    <button type="button" id="fast-name-race-finish" class="btn btn-outline-secondary">Finish activity</button>
+                </div>
+            </form>
+        </section>
+    }
+    else
+    {
+        <p class="learner-empty-state">This practice assignment is not available right now. Please ask your support professional for help.</p>
+    }
+
+    <p class="mt-4"><a asp-action="Index">Return to practice activities</a></p>
+</section>
+
+@if (!Model.IsCompleted && Model.AttemptId is not null && Model.Items.Count > 0)
+{
+    <script src="~/js/fast-name-race.js" asp-append-version="true" defer></script>
+}

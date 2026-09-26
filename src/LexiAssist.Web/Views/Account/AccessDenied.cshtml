@@ -1,0 +1,12 @@
+@{
+    ViewData["Title"] = "Access denied";
+}
+
+<section class="auth-page" aria-labelledby="access-denied-heading">
+    <div class="auth-card text-center">
+        <img class="brand-logo auth-logo" src="~/images/branding/lexiassist-logo.png" alt="LexiAssist" />
+        <h1 id="access-denied-heading" class="auth-title">Access denied</h1>
+        <p class="auth-intro">Your account does not have permission to view this page. If you think this is a mistake, contact an administrator.</p>
+        <a asp-controller="Home" asp-action="Index" class="btn btn-primary">Return to home</a>
+    </div>
+</section>

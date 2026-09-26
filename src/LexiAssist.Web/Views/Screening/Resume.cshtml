@@ -1,0 +1,203 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningRunnerViewModel
+@{
+    ViewData["Title"] = "Resume screening";
+}
+
+<section class="dashboard-page" aria-labelledby="resume-screening-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Learner workspace</p>
+        <h1 id="resume-screening-heading">Resume screening</h1>
+        <p class="learner-dashboard-intro">Your in-progress screening was started @(Model.AttemptStartedAtUtc.ToString("u")).</p>
+    </header>
+
+    <partial name="_ScreeningNotice" />
+
+    @if (Model.AudioRecorder is { } audioRecorder)
+    {
+        <partial name="_LearnerAudioRecorder" model="audioRecorder" />
+    }
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+
+    @if (Model.IsUnavailable)
+    {
+        <div class="learner-empty-state" role="status">
+            <h2 class="h4">Questions are not available right now</h2>
+            <p class="mb-0">@(Model.UnavailableMessage ?? "Your saved screening is still here. Please try again later or contact your support person.")</p>
+        </div>
+        <a asp-action="Index" class="btn btn-outline-secondary mt-3">Back to screening overview</a>
+    }
+    else
+    {
+        <section aria-labelledby="question-progress-heading" class="mb-4">
+            <h2 id="question-progress-heading" class="visually-hidden">Screening progress</h2>
+            <p class="mb-2">Question @Model.QuestionNumber of @Model.TotalQuestionCount</p>
+            <div class="progress" role="progressbar" aria-label="Screening progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Model.ProgressPercentage">
+                <div class="progress-bar" style="width: @Model.ProgressPercentage%"></div>
+            </div>
+        </section>
+
+        <section class="admin-details-card screening-question" aria-labelledby="question-heading">
+            <p class="auth-eyebrow">@Model.ScreeningTestName</p>
+            @if (!string.IsNullOrWhiteSpace(Model.TestInstructions))
+            {
+                <p class="text-secondary">@Model.TestInstructions</p>
+            }
+
+            @if (Model.Prompt is null)
+            {
+                <div class="learner-empty-state" role="status">
+                    <h2 id="question-heading" class="h4">This question is not ready</h2>
+                    <p class="mb-0">Your saved progress is intact. Please try again later.</p>
+                </div>
+            }
+            else if (Model.IsTimedNaming)
+            {
+                <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                <p class="text-secondary">Rapid Automated Naming</p>
+                <partial name="_TimedNamingActivity" model="Model" />
+            }
+            else if (Model.IsWorkingMemorySequence)
+            {
+                <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                <p class="text-secondary">Working memory sequence</p>
+                <partial name="_WorkingMemorySequenceActivity" model="Model" />
+            }
+            else if (Model.IsTimedMatching)
+            {
+                <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                <p class="text-secondary">Timed matching</p>
+                <partial name="_TimedMatchingActivity" model="Model" />
+            }
+            else if (Model.IsPatternReasoning)
+            {
+                <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                <p class="text-secondary">Broader thinking / Pattern reasoning</p>
+                <partial name="_PatternReasoningActivity" model="Model" />
+            }
+            else if (Model.IsReadingFluency)
+            {
+                <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                <p class="text-secondary">Reading Fluency</p>
+                <partial name="_ReadingFluencyActivity" model="Model" />
+            }
+            else
+            {
+                <form asp-action="Respond" method="post">
+                    @Html.AntiForgeryToken()
+                    <input asp-for="QuestionToken" type="hidden" />
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+                    @if (Model.IsReadingComprehension)
+                    {
+                        <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                        <p class="text-secondary">Reading comprehension question</p>
+                        <div class="reading-fluency-passage mb-3" tabindex="0" aria-label="Passage for the comprehension question">@Model.PassageText</div>
+                        <p class="text-secondary">Read the passage, then answer the question below.</p>
+                    }
+                    else if (Model.IsListeningComprehension)
+                    {
+                        <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                        <p class="text-secondary">Listen to the audio, then answer the question below.</p>
+                        <partial name="_ListeningComprehensionPlayer" model="Model" />
+                    }
+                    else if (Model.QuestionType is LexiAssist.Web.Models.Screening.ScreeningQuestionType.WordReading or LexiAssist.Web.Models.Screening.ScreeningQuestionType.NonWordReading)
+                    {
+                        <h2 id="question-heading" class="visually-hidden">@(Model.QuestionType == LexiAssist.Web.Models.Screening.ScreeningQuestionType.WordReading ? "Read the word" : "Read this made-up word")</h2>
+                        <p class="auth-eyebrow">@(Model.QuestionType == LexiAssist.Web.Models.Screening.ScreeningQuestionType.WordReading ? "Read the word" : "Read this made-up word")</p>
+                        <div class="screening-reading-stimulus">@Model.Prompt</div>
+                        @if (Model.AudioRecorder is null)
+                        {
+                            <p class="text-secondary mt-3">Type what you read below. This activity does not record your voice or automatically evaluate pronunciation.</p>
+                        }
+                        else
+                        {
+                            <p class="text-secondary mt-3">Type what you read below. Pronunciation is not automatically evaluated.</p>
+                        }
+                    }
+                    else
+                    {
+                        <h2 id="question-heading" class="h4">@Model.Prompt</h2>
+                        <p class="text-secondary">@Model.QuestionTypeName</p>
+                    }
+
+                    @if (Model.QuestionType is LexiAssist.Web.Models.Screening.ScreeningQuestionType.MultipleChoice or
+                        LexiAssist.Web.Models.Screening.ScreeningQuestionType.PhonologicalChoice or
+                        LexiAssist.Web.Models.Screening.ScreeningQuestionType.PatternReasoning)
+                    {
+                        <fieldset class="mb-3">
+                            <legend class="form-label">Choose one answer</legend>
+                            @for (var index = 0; index < Model.AnswerChoices.Count; index++)
+                            {
+                                var choice = Model.AnswerChoices[index];
+                                var choiceId = $"answer-choice-{index}";
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="SelectedAnswer" id="@choiceId" value="@choice"
+                                           required checked="@(string.Equals(ViewData.ModelState["SelectedAnswer"]?.AttemptedValue, choice, StringComparison.Ordinal) ? "checked" : null)" />
+                                    <label class="form-check-label" for="@choiceId">@choice</label>
+                                </div>
+                            }
+                        </fieldset>
+                        <span asp-validation-for="SelectedAnswer" aria-live="polite" class="text-danger"></span>
+                    }
+                    else if (Model.QuestionType == LexiAssist.Web.Models.Screening.ScreeningQuestionType.Spelling)
+                    {
+                        <div class="mb-3">
+                            <label for="TextAnswer" class="form-label">Type your answer</label>
+                            <input id="TextAnswer" name="TextAnswer" type="text" class="form-control" maxlength="8000" required
+                                   value="@ViewData.ModelState["TextAnswer"]?.AttemptedValue" autocomplete="off" />
+                            <span asp-validation-for="TextAnswer" aria-live="polite" class="text-danger"></span>
+                        </div>
+                    }
+                    else if (Model.QuestionType is LexiAssist.Web.Models.Screening.ScreeningQuestionType.WordReading or LexiAssist.Web.Models.Screening.ScreeningQuestionType.NonWordReading)
+                    {
+                        <div class="mb-3">
+                            <label for="TextAnswer" class="form-label">What did you read?</label>
+                            <input id="TextAnswer" name="TextAnswer" type="text" class="form-control" maxlength="8000" required
+                                   value="@ViewData.ModelState["TextAnswer"]?.AttemptedValue" autocomplete="off" />
+                            <span asp-validation-for="TextAnswer" aria-live="polite" class="text-danger"></span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label for="TextAnswer" class="form-label">Your response</label>
+                            <textarea id="TextAnswer" name="TextAnswer" class="form-control" rows="4" maxlength="8000" required>@ViewData.ModelState["TextAnswer"]?.AttemptedValue</textarea>
+                            <span asp-validation-for="TextAnswer" aria-live="polite" class="text-danger"></span>
+                        </div>
+                    }
+
+                    <button type="submit" class="btn btn-primary" data-listening-answer-submit disabled="@(Model.IsListeningComprehension ? "disabled" : null)">Save and continue</button>
+                </form>
+            }
+        </section>
+    }
+</section>
+
+@section Scripts
+{
+    @if (!Model.IsUnavailable && Model.IsTimedNaming)
+    {
+        <script src="~/js/screening-timed-naming.js" asp-append-version="true"></script>
+    }
+    @if (!Model.IsUnavailable && Model.IsReadingFluency)
+    {
+        <script src="~/js/screening-reading-fluency.js" asp-append-version="true"></script>
+    }
+    @if (!Model.IsUnavailable && Model.IsWorkingMemorySequence)
+    {
+        <script src="~/js/screening-working-memory.js" asp-append-version="true"></script>
+    }
+    @if (!Model.IsUnavailable && Model.IsTimedMatching)
+    {
+        <script src="~/js/screening-timed-matching.js" asp-append-version="true"></script>
+    }
+    @if (!Model.IsUnavailable && Model.IsListeningComprehension)
+    {
+        <script src="~/js/screening-listening-comprehension.js" asp-append-version="true"></script>
+    }
+}
+

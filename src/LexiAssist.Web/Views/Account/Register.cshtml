@@ -1,0 +1,82 @@
+@model LexiAssist.Web.ViewModels.RegisterViewModel
+@{
+    ViewData["Title"] = "Create learner account";
+}
+
+<section class="auth-page" aria-labelledby="register-heading">
+    <div class="auth-card auth-card-wide">
+        <img class="brand-logo auth-logo" src="~/images/branding/lexiassist-logo.png" alt="LexiAssist" />
+        <h1 id="register-heading" class="auth-title">Create your learner account</h1>
+        <p class="auth-intro">Enter your details to get started.</p>
+
+        <div class="screening-notice mb-4" role="note" aria-label="Screening and privacy notice">
+            <h2 class="h6 fw-bold">Screening and privacy notice</h2>
+            <p class="mb-0">Your registration details are used to create your LexiAssist account. LexiAssist provides educational screening and support only; it does not provide a clinical diagnosis. For clinical concerns, speak with a qualified professional.</p>
+        </div>
+
+        <form asp-controller="Account" asp-action="Register" method="post" class="auth-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label asp-for="FirstName" class="form-label"></label>
+                    <input asp-for="FirstName" class="form-control" autocomplete="given-name" autofocus />
+                    <span asp-validation-for="FirstName" aria-live="polite" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="LastName" class="form-label"></label>
+                    <input asp-for="LastName" class="form-control" autocomplete="family-name" />
+                    <span asp-validation-for="LastName" aria-live="polite" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label asp-for="PreferredName" class="form-label"></label>
+                    <input asp-for="PreferredName" class="form-control" autocomplete="nickname" />
+                    <span asp-validation-for="PreferredName" aria-live="polite" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="DateOfBirth" class="form-label"></label>
+                    <input asp-for="DateOfBirth" class="form-control" max="@DateTime.UtcNow.ToString("yyyy-MM-dd")" />
+                    <span asp-validation-for="DateOfBirth" aria-live="polite" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" autocomplete="email" />
+                <span asp-validation-for="Email" aria-live="polite" class="text-danger small"></span>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                    <span asp-validation-for="Password" aria-live="polite" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="ConfirmPassword" class="form-label"></label>
+                    <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                    <span asp-validation-for="ConfirmPassword" aria-live="polite" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <div class="form-check mb-4">
+                <input asp-for="AcceptScreeningPrivacyNotice" class="form-check-input" />
+                <label asp-for="AcceptScreeningPrivacyNotice" class="form-check-label"></label>
+                <span asp-validation-for="AcceptScreeningPrivacyNotice" aria-live="polite" class="d-block text-danger small"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100">Create learner account</button>
+        </form>
+
+        <p class="auth-footnote">Already have an account? <a asp-controller="Account" asp-action="Login">Sign in</a></p>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

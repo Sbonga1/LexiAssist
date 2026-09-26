@@ -1,0 +1,153 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningResultViewModel
+@{
+    ViewData["Title"] = "Screening result";
+    var tierClass = Model.SupportTier?.ToString().ToLowerInvariant() ?? "unavailable";
+}
+
+<section class="dashboard-page screening-result-page" aria-labelledby="screening-result-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Learner workspace</p>
+        <h1 id="screening-result-heading">Screening complete</h1>
+        <p class="learner-dashboard-intro">Thank you for completing your educational screening. Your responses have been saved.</p>
+        <p class="text-secondary mb-0">Report generated @Model.GeneratedAtUtc.ToString("D").</p>
+    </header>
+
+    <partial name="_ScreeningNotice" />
+
+    <section class="screening-result-summary" aria-labelledby="tier-heading">
+        <div>
+            <p class="auth-eyebrow mb-2">Screening/support tier</p>
+            <h2 id="tier-heading" class="screening-result-tier-title">
+                <span class="screening-tier-badge screening-tier-@tierClass">
+                    @(Model.SupportTier?.ToString() ?? "Not available")
+                </span>
+            </h2>
+            <p class="mb-2">@Model.TierDescription</p>
+            <p class="mb-0">@Model.Explanation</p>
+        </div>
+    </section>
+
+    <section class="screening-result-next-step" aria-labelledby="next-action-heading">
+        <h2 id="next-action-heading" class="h4">Recommended next action</h2>
+        <p class="mb-0">@Model.RecommendedNextAction</p>
+    </section>
+
+    <section class="screening-result-areas" aria-labelledby="skill-area-heading">
+        <div class="screening-result-section-heading">
+            <div>
+                <h2 id="skill-area-heading">Skill-area summary</h2>
+                <p>These summaries describe responses to the activities included in this screening.</p>
+            </div>
+        </div>
+
+        @if (Model.SkillAreas.Count == 0)
+        {
+            <p class="learner-empty-state">No skill-area summaries were available for this screening.</p>
+        }
+        else
+        {
+            <ul class="screening-result-area-list">
+                @foreach (var area in Model.SkillAreas)
+                {
+                    <li class="screening-result-area">
+                        <div class="screening-result-area-heading">
+                            <h3>@area.Name</h3>
+                            @if (area.PercentageScore is { } percentage)
+                            {
+                                <span class="screening-result-match-rate">@percentage.ToString("0.##")% matched</span>
+                            }
+                            else
+                            {
+                                <span class="screening-result-match-rate">Summary unavailable</span>
+                            }
+                        </div>
+                        <p class="mb-0">@area.Summary</p>
+                        <partial name="_ScreeningActivityMetrics" model="area.ActivityMetrics" />
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    @if (Model.MemoryAndBroaderThinkingSkills is { } broaderThinking)
+    {
+        <section class="screening-result-areas mt-4" aria-labelledby="memory-broader-thinking-heading">
+            <div class="screening-result-section-heading">
+                <div>
+                    <p class="auth-eyebrow mb-2">Optional screening area</p>
+                    <h2 id="memory-broader-thinking-heading">Memory and Broader Thinking Skills</h2>
+                    <p class="mb-0">These original activities provide screening information only. They do not diagnose a condition or measure intelligence.</p>
+                </div>
+            </div>
+
+            <div class="screening-result-area mt-3">
+                <h3 class="h4">Activity completion</h3>
+                <p>The configured activities in this optional area were completed and saved with this screening.</p>
+
+                <partial name="_LearnerOptionalScreeningMetrics" model="broaderThinking.ActivityMetrics" />
+
+                <h3 class="h4 mt-4">Areas that may benefit from additional support</h3>
+                @if (broaderThinking.IsFlaggedForSupport)
+                {
+                    <p>This category met the configured rule for additional support review. This is a support cue, not a diagnosis.</p>
+                }
+                else
+                {
+                    <p>No additional-support flag was produced for this category by the configured review rules. If you have questions, discuss them with someone you trust.</p>
+                }
+
+                <h3 class="h4 mt-4">Professional review</h3>
+                @if (Model.IsReferralRecommended)
+                {
+                    <p class="mb-0">A suitable support professional may review this screening according to the LexiAssist support workflow.</p>
+                }
+                else
+                {
+                    <p class="mb-0">If you have questions about these screening indicators, consider discussing them with a suitable support professional.</p>
+                }
+            </div>
+        </section>
+    }
+
+    <div class="screening-result-insights">
+        <section class="screening-result-insight" aria-labelledby="strengths-heading">
+            <h2 id="strengths-heading">Potential strengths in these activities</h2>
+            <p>These are the available scored areas with the highest response match rates in this screening. This is a relative snapshot, not a full measure of your abilities.</p>
+            @if (Model.Strengths.Count == 0)
+            {
+                <p class="learner-empty-state">No relative strength was highlighted from the available scored activities. This does not mean you lack strengths; the summary only compares the activities in this screening.</p>
+            }
+            else
+            {
+                <ul class="screening-result-simple-list">
+                    @foreach (var area in Model.Strengths)
+                    {
+                        <li><strong>@area.Name:</strong> @area.Summary</li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="screening-result-insight" aria-labelledby="support-areas-heading">
+            <h2 id="support-areas-heading">Areas that may benefit from support</h2>
+            @if (Model.SupportAreas.Count == 0)
+            {
+                <p class="learner-empty-state">No areas were flagged by the configured answer-key review rules. This result does not rule out support needs; discuss any questions or concerns with someone you trust.</p>
+            }
+            else
+            {
+                <ul class="screening-result-simple-list">
+                    @foreach (var area in Model.SupportAreas)
+                    {
+                        <li><strong>@area.Name:</strong> @area.Summary</li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+
+    <div class="screening-result-actions">
+        <a asp-action="Index" class="btn btn-primary">Return to screening overview</a>
+        <a asp-controller="Dashboard" asp-action="Learner" class="btn btn-outline-secondary">Go to dashboard</a>
+    </div>
+</section>

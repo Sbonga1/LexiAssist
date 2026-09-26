@@ -1,0 +1,105 @@
+@model LexiAssist.Web.ViewModels.Activities.ActivityAssignmentCreateViewModel
+@{
+    ViewData["Title"] = "Learning activity recommendations";
+}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <p class="auth-eyebrow">Learning support · Activity assignment</p>
+        <h1 class="h2 mb-1">@Model.LearnerName</h1>
+        <p class="text-secondary mb-0">Related screening report · @Model.ReportGeneratedAtUtc.ToString("u")</p>
+    </div>
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">Back</a>
+</div>
+
+<div class="alert alert-info" role="note">
+    Activity recommendations come from the configured skill-area mapping. They are suggestions only. A recommendation never creates or changes an assignment; choose an activity below to make a manual assignment.
+</div>
+
+@if (TempData["StatusMessage"] is string statusMessage)
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+
+<section class="admin-details-card mb-4" aria-labelledby="recommendations-heading">
+    <h2 id="recommendations-heading" class="h4">Configured recommendations</h2>
+    @if (Model.FlaggedAreas.Count == 0)
+    {
+        <p class="text-secondary">No flagged screening skill areas were stored in this report.</p>
+    }
+    else
+    {
+        <p>Flagged skill areas: @string.Join(", ", Model.FlaggedAreas)</p>
+    }
+
+    @if (Model.Recommendations.Count == 0)
+    {
+        <p class="learner-empty-state mb-0">No active activities currently match the saved flags or tagged response categories.</p>
+    }
+    else
+    {
+        <ul class="list-group">
+        @foreach (var recommendation in Model.Recommendations)
+        {
+            <li class="list-group-item">
+                <h3 class="h6 mb-1">@recommendation.ActivityName</h3>
+                <p class="mb-1">@recommendation.Description</p>
+                <small class="text-secondary">Mapped from: @string.Join(", ", recommendation.MatchedIndicators)</small>
+            </li>
+        }
+        </ul>
+    }
+</section>
+
+<section class="admin-details-card mb-4" aria-labelledby="assign-heading">
+    <h2 id="assign-heading" class="h4">Manually assign an activity</h2>
+    @if (Model.ActiveActivities.Count == 0)
+    {
+        <p class="learner-empty-state mb-0">No active learning activities are available to assign yet.</p>
+    }
+    else
+    {
+        <form asp-action="Create" asp-route-reportId="@Model.ReportId" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+            <div class="mb-3">
+                <label asp-for="LearningActivityId" class="form-label">Learning activity</label>
+                <select asp-for="LearningActivityId" class="form-select" required>
+                    <option value="0">Choose an activity</option>
+                    @foreach (var activity in Model.ActiveActivities)
+                    {
+                        <option value="@activity.Id">@activity.Name (@activity.ActivityType)</option>
+                    }
+                </select>
+                <span asp-validation-for="LearningActivityId" aria-live="polite" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary">Assign activity</button>
+        </form>
+    }
+</section>
+
+<section aria-labelledby="existing-assignments-heading">
+    <h2 id="existing-assignments-heading" class="h4">Assignments related to this report</h2>
+    @if (Model.ExistingAssignments.Count == 0)
+    {
+        <p class="learner-empty-state">No activities have been assigned from this report.</p>
+    }
+    else
+    {
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Activities already assigned from this screening report</caption>
+                <thead class="table-light">
+                    <tr><th scope="col">Activity</th><th scope="col">Assigned (UTC)</th><th scope="col">Status</th></tr>
+                </thead>
+                <tbody>
+                @foreach (var assignment in Model.ExistingAssignments)
+                {
+                    <tr><th scope="row">@assignment.ActivityName</th><td>@assignment.AssignedAtUtc.ToString("u")</td><td>@assignment.Status</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+

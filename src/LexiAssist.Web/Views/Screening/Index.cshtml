@@ -1,0 +1,58 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningLandingViewModel
+@{
+    ViewData["Title"] = "Screening";
+}
+
+<section class="dashboard-page" aria-labelledby="screening-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Learner workspace</p>
+        <h1 id="screening-heading">Screening</h1>
+        <p class="learner-dashboard-intro">Explore the educational screening categories available to you.</p>
+    </header>
+
+    <partial name="_ScreeningNotice" />
+
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="alert">@errorMessage</div>
+    }
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+
+    @if (Model.HasIncompleteAttempt)
+    {
+        <div class="dashboard-note mb-4">
+            <h2 class="h5">You have a screening in progress</h2>
+            <p class="mb-2">Started @(Model.AttemptStartedAtUtc?.ToString("u")).</p>
+            <a asp-action="Resume" class="btn btn-primary">Resume screening</a>
+        </div>
+    }
+    else if (Model.Categories.Count > 0 && Model.HasAvailableQuestions)
+    {
+        <p class="mb-3">Starting creates one in-progress screening for you. You can return to it later.</p>
+        <a asp-action="Start" class="btn btn-primary mb-4">Start screening</a>
+    }
+    else if (Model.Categories.Count > 0)
+    {
+        <p class="learner-empty-state mb-4">Screening questions are not ready yet. Please check back later.</p>
+    }
+
+    <section aria-labelledby="categories-heading" class="mt-3">
+        <h2 id="categories-heading" class="h4">Categories included</h2>
+        @if (Model.Categories.Count == 0)
+        {
+            <p class="learner-empty-state">There are no active screening categories available right now.</p>
+        }
+        else
+        {
+            <ol class="list-group list-group-numbered screening-category-list">
+            @foreach (var category in Model.Categories)
+            {
+                <li class="list-group-item">@category.Name</li>
+            }
+            </ol>
+        }
+    </section>
+</section>

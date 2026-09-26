@@ -1,0 +1,101 @@
+@model LexiAssist.Web.ViewModels.AdministratorDashboardViewModel
+@{
+    ViewData["Title"] = "Administrator dashboard";
+}
+
+<section class="dashboard-page administrator-dashboard" aria-labelledby="dashboard-heading">
+    <header class="dashboard-heading">
+        <p class="auth-eyebrow">Administration</p>
+        <h1 id="dashboard-heading">Administrator dashboard</h1>
+        <p class="learner-dashboard-intro">A concise view of current LexiAssist activity and items that may need attention.</p>
+        <img class="admin-dashboard-brand-mark" src="~/images/branding/lexiassist-logo.png" alt="" aria-hidden="true" />
+    </header>
+
+    <div class="admin-overview-grid" aria-label="System overview">
+        <article class="admin-overview-card admin-stat-card admin-stat-card-blue">
+            <div class="admin-stat-heading"><span class="admin-stat-icon" aria-hidden="true">♧</span><p class="admin-overview-label">Active learners</p></div>
+            <p class="admin-overview-value">@Model.ActiveLearnerCount</p>
+            <a asp-controller="AdminUsers" asp-action="Index" class="admin-overview-link">Manage users <span aria-hidden="true">&#8594;</span></a>
+        </article>
+        <article class="admin-overview-card admin-stat-card admin-stat-card-teal">
+            <div class="admin-stat-heading"><span class="admin-stat-icon" aria-hidden="true">▤</span><p class="admin-overview-label">Completed screenings</p></div>
+            <p class="admin-overview-value">@Model.CompletedScreeningCount</p>
+            <a asp-controller="AdminScreeningReports" asp-action="Index" class="admin-overview-link">View reports <span aria-hidden="true">&#8594;</span></a>
+        </article>
+        <article class="admin-overview-card admin-stat-card admin-stat-card-orange">
+            <div class="admin-stat-heading"><span class="admin-stat-icon" aria-hidden="true">◷</span><p class="admin-overview-label">Pending referrals</p></div>
+            <p class="admin-overview-value">@Model.PendingReferralCount</p>
+            <a asp-controller="AdminReferrals" asp-action="Index" class="admin-overview-link">Manage referrals <span aria-hidden="true">&#8594;</span></a>
+        </article>
+        <article class="admin-overview-card admin-stat-card admin-stat-card-purple">
+            <div class="admin-stat-heading"><span class="admin-stat-icon" aria-hidden="true">▣</span><p class="admin-overview-label">Assigned referrals</p></div>
+            <p class="admin-overview-value">@Model.AssignedReferralCount</p>
+            <a asp-controller="AdminReferrals" asp-action="Index" class="admin-overview-link">Review assignments <span aria-hidden="true">&#8594;</span></a>
+        </article>
+        <article class="admin-overview-card admin-stat-card admin-stat-card-blue">
+            <div class="admin-stat-heading"><span class="admin-stat-icon" aria-hidden="true">↗</span><p class="admin-overview-label">Active learning activities</p></div>
+            <p class="admin-overview-value">@Model.ActiveLearningActivityCount</p>
+            <a asp-controller="AdminScreeningReports" asp-action="Index" class="admin-overview-link">Open reports to assign practice <span aria-hidden="true">&#8594;</span></a>
+        </article>
+    </div>
+
+    <section class="admin-dashboard-section admin-management-section" aria-labelledby="management-heading">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+                <h2 id="management-heading" class="h4 mb-1">Management areas</h2>
+                <p class="text-secondary mb-0">Open an area to manage configuration and support workflows.</p>
+            </div>
+        </div>
+        <div class="admin-management-links">
+            <a asp-controller="AdminUsers" asp-action="Index" class="admin-management-tile admin-management-tile-blue"><span class="admin-management-icon" aria-hidden="true">♙</span><span>Users</span><span class="admin-management-arrow" aria-hidden="true">&#8594;</span></a>
+            <a asp-controller="AdminScreeningTests" asp-action="Index" class="admin-management-tile admin-management-tile-teal"><span class="admin-management-icon" aria-hidden="true">▤</span><span>Screening tests</span><span class="admin-management-arrow" aria-hidden="true">&#8594;</span></a>
+            <a asp-controller="AdminScreeningReports" asp-action="Index" class="admin-management-tile admin-management-tile-purple"><span class="admin-management-icon" aria-hidden="true">▥</span><span>Screening reports</span><span class="admin-management-arrow" aria-hidden="true">&#8594;</span></a>
+            <a asp-controller="AdminReferrals" asp-action="Index" class="admin-management-tile admin-management-tile-orange"><span class="admin-management-icon" aria-hidden="true">↗</span><span>Referrals</span><span class="admin-management-arrow" aria-hidden="true">&#8594;</span></a>
+            <a asp-controller="AdminEducationalResources" asp-action="Index" class="admin-management-tile admin-management-tile-blue"><span class="admin-management-icon" aria-hidden="true">▣</span><span>Educational resources</span><span class="admin-management-arrow" aria-hidden="true">&#8594;</span></a>
+            <a asp-controller="AdminAudit" asp-action="Index" class="admin-management-tile admin-management-tile-neutral"><span class="admin-management-icon" aria-hidden="true">◷</span><span>Audit log</span><span class="admin-management-arrow" aria-hidden="true">&#8594;</span></a>
+        </div>
+    </section>
+
+    <section class="admin-dashboard-section admin-alerts-section" aria-labelledby="alerts-heading">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+                <h2 id="alerts-heading" class="h4 mb-1">Recent system alerts</h2>
+                <p class="text-secondary mb-0">Recent in-application alerts for this administrator account.</p>
+            </div>
+            <a asp-controller="Notifications" asp-action="Index" class="btn btn-sm btn-outline-secondary">View all alerts</a>
+        </div>
+        @if (Model.RecentSystemAlerts.Count == 0)
+        {
+            <p class="learner-empty-state" role="status">There are no recent system alerts.</p>
+        }
+        else
+        {
+            <div class="table-responsive admin-alerts-table-wrap">
+                <table class="table table-hover align-middle mb-0 admin-alerts-table">
+                    <caption class="visually-hidden">Recent system alerts</caption>
+                    <thead class="table-light"><tr><th scope="col">Alert</th><th scope="col">Date</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Action</span></th></tr></thead>
+                    <tbody>
+                    @foreach (var alert in Model.RecentSystemAlerts)
+                    {
+                        var alertStatus = alert.IsGenerated ? "Needs attention" : alert.ReadAtUtc is null ? "Unread" : "Read";
+                        var alertStatusClass = alert.IsGenerated ? "admin-status-attention" : alert.ReadAtUtc is null ? "admin-status-unread" : "admin-status-read";
+                        <tr>
+                            <th scope="row">
+                                <div class="admin-alert-title"><span class="admin-alert-icon @(alert.IsGenerated ? "admin-alert-icon-attention" : "")" aria-hidden="true">!</span><span><strong>@alert.Title</strong><small>@alert.Message</small></span></div>
+                            </th>
+                            <td>@alert.CreatedAtUtc.ToLocalTime().ToString("g")</td>
+                            <td><span class="admin-status-badge @alertStatusClass">@alertStatus</span></td>
+                            <td class="text-end">
+                                @if (!string.IsNullOrWhiteSpace(alert.RelatedUrl) && Url.IsLocalUrl(alert.RelatedUrl))
+                                {
+                                    <a href="@alert.RelatedUrl" class="btn btn-sm btn-outline-primary admin-alert-open">Open <span aria-hidden="true">&#8594;</span></a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</section>

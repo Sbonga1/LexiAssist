@@ -1,0 +1,167 @@
+@model LexiAssist.Web.ViewModels.AdminScreeningTests.AdminScreeningTestDetailsViewModel
+@{
+    ViewData["Title"] = "Screening test details";
+}
+
+<section class="admin-screening-details-page" aria-labelledby="screening-test-heading">
+    <div class="admin-screening-details-heading">
+        <div class="admin-screening-details-heading-copy">
+            <p class="auth-eyebrow">Administration · Screening Tests</p>
+            <h1 id="screening-test-heading">@Model.Name</h1>
+            <span class="admin-screening-details-slug">@Model.Slug</span>
+        </div>
+        <div class="admin-screening-details-actions" aria-label="Screening test actions">
+            <a asp-controller="AdminScreeningQuestions" asp-action="Index" asp-route-testId="@Model.Id" class="btn admin-screening-details-action admin-screening-details-action-primary">
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                    <path d="M12 3.5a2.2 2.2 0 0 0 2.05 1.4 2.2 2.2 0 0 0 2.05-1.4l1.55.9a2.2 2.2 0 0 0 .55 2.5 2.2 2.2 0 0 0 2.55.32l.9 1.55a2.2 2.2 0 0 0-1.4 2.05 2.2 2.2 0 0 0 1.4 2.05l-.9 1.55a2.2 2.2 0 0 0-2.55-.32 2.2 2.2 0 0 0-.55 2.5l-1.55.9a2.2 2.2 0 0 0-2.05-1.4 2.2 2.2 0 0 0-2.05 1.4l-1.55-.9a2.2 2.2 0 0 0-.55-2.5 2.2 2.2 0 0 0-2.55-.32l-.9-1.55a2.2 2.2 0 0 0 1.4-2.05 2.2 2.2 0 0 0-1.4-2.05l.9-1.55a2.2 2.2 0 0 0 2.55.32 2.2 2.2 0 0 0 .55-2.5Z"></path>
+                    <circle cx="12" cy="12" r="2.6"></circle>
+                </svg>
+                <span>Manage questions (@Model.QuestionCount)</span>
+            </a>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn admin-screening-details-action admin-screening-details-action-secondary">
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                    <path d="m4.5 16.8-.7 3.4 3.4-.7L18.5 7.5a2.4 2.4 0 0 0-3.4-3.4Z"></path>
+                    <path d="m13.8 5.2 3.4 3.4"></path>
+                </svg>
+                <span>Edit</span>
+            </a>
+            <a asp-action="Index" class="btn admin-screening-details-action admin-screening-details-action-secondary">
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                    <path d="M19 12H5"></path>
+                    <path d="m11 18-6-6 6-6"></path>
+                </svg>
+                <span>Back to screening tests</span>
+            </a>
+        </div>
+    </div>
+
+@if (TempData["StatusMessage"] is string statusMessage)
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+
+@if (string.Equals(Model.Name, "Memory and Broader Thinking Skills", StringComparison.Ordinal))
+{
+    <div class="alert alert-warning" role="note">
+        This optional category is disabled by default. Add only original educational screening activities, and activate the category only after the required organisational and professional approval.
+    </div>
+}
+
+    <section class="admin-screening-details-panel" aria-labelledby="test-information-heading">
+        <header class="admin-screening-details-panel-header">
+            <span class="admin-screening-details-panel-icon" aria-hidden="true">
+                <svg focusable="false" viewBox="0 0 24 24">
+                    <path d="M6.5 3.5h8l3 3v14h-11Z"></path>
+                    <path d="M14.5 3.5v3h3"></path>
+                    <path d="M9 11h6M9 14.5h6M9 18h3.5"></path>
+                </svg>
+            </span>
+            <div>
+                <h2 id="test-information-heading">Test information</h2>
+                <p>Key details about this screening test, including its purpose and current status.</p>
+            </div>
+        </header>
+
+        <dl class="admin-screening-details-rows">
+            <div class="admin-screening-details-row">
+                <dt>
+                    <span class="admin-screening-details-row-icon" aria-hidden="true">
+                        <svg focusable="false" viewBox="0 0 24 24">
+                            <path d="M6.5 3.5h8l3 3v14h-11Z"></path>
+                            <path d="M14.5 3.5v3h3"></path>
+                            <path d="M9 11h6M9 14.5h6M9 18h3.5"></path>
+                        </svg>
+                    </span>
+                    <span>Description</span>
+                </dt>
+                <dd>@Model.Description</dd>
+            </div>
+
+            <div class="admin-screening-details-row">
+                <dt>
+                    <span class="admin-screening-details-row-icon" aria-hidden="true">
+                        <svg focusable="false" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="8.5"></circle>
+                            <path d="M12 10v5"></path>
+                            <path d="M12 7.2h.01"></path>
+                        </svg>
+                    </span>
+                    <span>Instructions</span>
+                </dt>
+                <dd>@Model.Instructions</dd>
+            </div>
+
+            <div class="admin-screening-details-row">
+                <dt>
+                    <span class="admin-screening-details-row-icon" aria-hidden="true">
+                        <svg focusable="false" viewBox="0 0 24 24">
+                            <path d="M5 19V9M10 19V5M15 19v-8M20 19V3"></path>
+                            <path d="M3.5 19.5h18"></path>
+                        </svg>
+                    </span>
+                    <span>Status</span>
+                </dt>
+                <dd>
+                    @if (Model.IsActive)
+                    {
+                        <span class="admin-screening-details-status admin-screening-details-status-active">
+                            <span class="admin-screening-details-status-dot" aria-hidden="true"></span>
+                            <span>Active</span>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="admin-screening-details-status admin-screening-details-status-inactive">
+                            <span class="admin-screening-details-status-dot" aria-hidden="true"></span>
+                            <span>Inactive</span>
+                        </span>
+                    }
+                </dd>
+            </div>
+
+            <div class="admin-screening-details-row">
+                <dt>
+                    <span class="admin-screening-details-row-icon" aria-hidden="true">
+                        <svg focusable="false" viewBox="0 0 24 24">
+                            <path d="M5 7h2M10 7h9M5 12h2M10 12h9M5 17h2M10 17h9"></path>
+                            <circle cx="8" cy="7" r=".9"></circle>
+                            <circle cx="8" cy="12" r=".9"></circle>
+                            <circle cx="8" cy="17" r=".9"></circle>
+                        </svg>
+                    </span>
+                    <span>Display order</span>
+                </dt>
+                <dd>@Model.SortOrder</dd>
+            </div>
+        </dl>
+    </section>
+
+    <div class="admin-screening-details-lifecycle">
+        @if (Model.IsActive)
+        {
+            <form asp-action="Deactivate" asp-route-id="@Model.Id" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn admin-screening-details-danger-action">
+                    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                        <path d="M5 7h14M9 7V4.5h6V7M7.5 7l.7 13h7.6l.7-13M10 10.5v6M14 10.5v6"></path>
+                    </svg>
+                    <span>Deactivate screening test</span>
+                </button>
+            </form>
+            <p>Deactivation preserves the test and any related records.</p>
+        }
+        else
+        {
+            <form asp-action="Activate" asp-route-id="@Model.Id" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn admin-screening-details-activate-action">
+                    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                        <path d="M5 12a7 7 0 0 0 12.5 4.4M19 12a7 7 0 0 0-12.5-4.4"></path>
+                        <path d="M17.5 16.5h2.8v-2.8M6.5 7.5H3.7v2.8"></path>
+                    </svg>
+                    <span>Activate screening test</span>
+                </button>
+            </form>
+        }
+    </div>
+</section>

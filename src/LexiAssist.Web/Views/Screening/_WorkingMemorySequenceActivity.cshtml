@@ -1,0 +1,26 @@
+@model LexiAssist.Web.ViewModels.Screening.ScreeningRunnerViewModel
+
+<form asp-action="Respond" method="post" id="working-memory-sequence-activity"
+      data-working-memory-activity
+      data-display-duration-ms="@Model.MemoryDisplayDurationMilliseconds"
+      data-sequence-length="@Model.WorkingMemorySequence.Count">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="QuestionToken" value="@Model.QuestionToken" />
+
+    <p id="working-memory-task-instructions" class="text-secondary">Look at the original sequence, then enter it in the same order after it disappears. Take your time when entering your answer. This is an educational activity, not a clinical assessment.</p>
+    <aside class="alert alert-light border mb-3" aria-labelledby="working-memory-practice-heading">
+        <h3 id="working-memory-practice-heading" class="h6">Practice example</h3>
+        <p class="mb-0">For practice only, remember <strong>A · 7</strong>. After it is hidden, you would type <strong>A 7</strong> in the answer box.</p>
+    </aside>
+    <div class="screening-reading-stimulus mb-3" data-working-memory-sequence role="status" aria-live="polite" aria-describedby="working-memory-task-instructions">
+        @string.Join(" · ", Model.WorkingMemorySequence)
+    </div>
+    <p class="small text-secondary" data-working-memory-status>Study the sequence carefully.</p>
+
+    <div data-working-memory-answer hidden>
+        <label for="TextAnswer" class="form-label">Enter the sequence in order</label>
+        <input id="TextAnswer" name="TextAnswer" type="text" class="form-control" maxlength="8000" autocomplete="off" disabled required />
+        <div class="form-text">Separate items with spaces or punctuation as appropriate.</div>
+        <button type="submit" class="btn btn-primary mt-3" disabled>Save and continue</button>
+    </div>
+</form>

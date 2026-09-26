@@ -1,0 +1,350 @@
+@using LexiAssist.Web.Models.Screening
+@model LexiAssist.Web.ViewModels.Referrals.PsychologistDataPassportViewModel
+@{
+    ViewData["Title"] = "Diagnostic Data Passport";
+}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <p class="auth-eyebrow">Psychologist workspace · Screening record</p>
+        <h1 class="h2 mb-1">Diagnostic Data Passport</h1>
+        <p class="text-secondary mb-0">@Model.LearnerName</p>
+    </div>
+    <a asp-action="Details" asp-route-id="@Model.ReferralId" class="btn btn-outline-secondary">Back to referral</a>
+</div>
+
+<div class="alert alert-info" role="note">
+    This passport summarizes stored educational screening data for professional review. It is not an automated medical diagnosis. Interpret the information in the learner’s wider context.
+</div>
+@if (TempData["StatusMessage"] is string statusMessage)
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+
+<section class="admin-details-card mb-4" aria-labelledby="profile-heading">
+    <h2 id="profile-heading" class="h4">Learner and screening</h2>
+    <dl class="row mb-0">
+        <dt class="col-sm-4">Learner</dt><dd class="col-sm-8">@Model.LearnerName</dd>
+        <dt class="col-sm-4">Email</dt><dd class="col-sm-8">@Model.LearnerEmail</dd>
+        <dt class="col-sm-4">Date of birth</dt><dd class="col-sm-8">@(Model.DateOfBirth?.ToString("d MMMM yyyy") ?? "Not provided")</dd>
+        <dt class="col-sm-4">Screening started (UTC)</dt><dd class="col-sm-8">@Model.ScreeningStartedAtUtc.ToString("u")</dd>
+        <dt class="col-sm-4">Screening completed (UTC)</dt><dd class="col-sm-8">@Model.ScreeningCompletedAtUtc.ToString("u")</dd>
+        <dt class="col-sm-4">Referral created (UTC)</dt><dd class="col-sm-8">@Model.ReferralCreatedAtUtc.ToString("u")</dd>
+        <dt class="col-sm-4">Screening risk/support tier</dt><dd class="col-sm-8">@(Model.RiskTier ?? "Not available")</dd>
+    </dl>
+    <p class="mt-3 mb-0">@Model.ScreeningSummary</p>
+</section>
+
+<section class="mb-4" aria-labelledby="category-results-heading">
+    <h2 id="category-results-heading" class="h4 mb-3">Category scores</h2>
+    @if (Model.CategoryScores.Count == 0)
+    {
+        <p class="text-secondary">Category score snapshots were not stored for this report.</p>
+    }
+    else
+    {
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Stored screening category scores</caption>
+                <thead class="table-light"><tr><th scope="col">Category</th><th scope="col">Stored score</th><th scope="col">Stored summary</th><th scope="col">Indicator</th></tr></thead>
+                <tbody>
+                @foreach (var area in Model.CategoryScores)
+                {
+                    <tr>
+                        <th scope="row">@area.Name</th>
+                        <td>@(area.PercentageScore.HasValue ? $"{area.PercentageScore.Value:0.#}%" : "Not available")</td>
+                        <td>@area.Summary</td>
+                        <td>@(area.IsFlaggedForSupport ? "Flagged for support review" : area.IsStrength ? "Recorded strength" : "No specific indicator stored")</td>
+                    </tr>
+                    @if (area.ActivityMetrics.Count > 0)
+                    {
+                        <tr>
+                            <td colspan="4"><partial name="_ScreeningActivityMetrics" model="area.ActivityMetrics" /></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (Model.MemoryAndBroaderThinkingSkills is { } optionalCategory)
+{
+    <partial name="_PassportMemoryAndBroaderThinkingSkills" model="optionalCategory" />
+
+    <section class="mb-4" aria-labelledby="optional-history-heading">
+        <h2 id="optional-history-heading" class="h4 mb-3">Comparable previous screening indicators</h2>
+        @if (Model.PreviousMemoryAndBroaderThinkingSkills.Count == 0)
+        {
+            <p class="text-secondary">No comparable historical activity data is available for this optional category.</p>
+        }
+        else
+        {
+            <p class="text-secondary">Only stored activity types that match the current optional screening are shown here. This is a descriptive comparison, not a diagnosis.</p>
+            <div class="table-responsive bg-white border rounded-3">
+                <table class="table align-middle mb-0">
+                    <caption class="visually-hidden">Comparable previous Memory and Broader Thinking Skills indicators</caption>
+                    <thead class="table-light"><tr><th scope="col">Completed (UTC)</th><th scope="col">Activity</th><th scope="col">Accuracy or score</th><th scope="col">Response-time information</th></tr></thead>
+                    <tbody>
+                    @foreach (var previous in Model.PreviousMemoryAndBroaderThinkingSkills)
+                    {
+                        @foreach (var metric in previous.ActivityMetrics)
+                        {
+                            var activityName = metric.ActivityType switch
+                            {
+                                ScreeningQuestionType.WorkingMemorySequence => "Working Memory",
+                                ScreeningQuestionType.TimedMatching => "Processing Speed",
+                                ScreeningQuestionType.PatternReasoning => "Pattern Reasoning",
+                                _ => metric.ActivityName
+                            };
+                            var score = metric.AccuracyPercentage ?? metric.Percentage;
+                            var responseTime = metric.ElapsedTimeMilliseconds is { } elapsed
+                                ? $"Elapsed: {elapsed:N0} ms"
+                                : metric.MedianResponseTimeMilliseconds is { } median
+                                    ? $"Median: {median:N0} ms"
+                                    : metric.AverageResponseTimeMilliseconds is { } average
+                                        ? $"Average: {average:N0} ms"
+                                        : "Not recorded";
+                            <tr>
+                                <th scope="row">@previous.ScreeningDateUtc.ToString("u")</th>
+                                <td>@activityName</td>
+                                <td>@(score is { } value ? $"{value:0.##}%" : "Not available")</td>
+                                <td>@responseTime</td>
+                            </tr>
+                        }
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+<section class="mb-4" aria-labelledby="flagged-areas-heading">
+    <h2 id="flagged-areas-heading" class="h4 mb-3">Flagged skill areas</h2>
+    @if (Model.FlaggedSkillAreas.Count == 0)
+    {
+        <p class="text-secondary">No flagged skill areas were stored in this report snapshot.</p>
+    }
+    else
+    {
+        <ul>
+        @foreach (var area in Model.FlaggedSkillAreas)
+        {
+            <li>@area.Name@(area.PercentageScore.HasValue ? $" — {area.PercentageScore.Value:0.#}% stored score" : string.Empty)</li>
+        }
+        </ul>
+    }
+</section>
+
+<section class="mb-4" aria-labelledby="timing-heading">
+    <h2 id="timing-heading" class="h4 mb-3">Timing information</h2>
+    @if (Model.TestTimings.Count == 0)
+    {
+        <p class="text-secondary">No category timing records are available.</p>
+    }
+    else
+    {
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Screening category timing records</caption>
+                <thead class="table-light"><tr><th scope="col">Category</th><th scope="col">Duration</th><th scope="col">Started (UTC)</th><th scope="col">Completed (UTC)</th></tr></thead>
+                <tbody>
+                @foreach (var timing in Model.TestTimings)
+                {
+                    <tr>
+                        <th scope="row">@timing.CategoryName</th>
+                        <td>@(timing.DurationMilliseconds.HasValue ? $"{timing.DurationMilliseconds.Value:N0} ms" : "Not recorded")</td>
+                        <td>@timing.StartedAtUtc.ToString("u")</td>
+                        <td>@(timing.CompletedAtUtc?.ToString("u") ?? "Not recorded")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+    <section class="mb-4" aria-labelledby="responses-heading">
+    <h2 id="responses-heading" class="h4 mb-2">Response and error categories</h2>
+    <p class="text-secondary">Counts below reflect stored response records and self-reported corrections. They are descriptive and do not independently indicate a diagnosis.</p>
+    @if (Model.ResponseCategories.Count == 0)
+    {
+        <p class="text-secondary">No response records are available.</p>
+    }
+    else
+    {
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Stored response and error category counts</caption>
+                <thead class="table-light"><tr><th scope="col">Response type</th><th scope="col">Responses</th><th scope="col">Stored correct</th><th scope="col">Stored errors</th><th scope="col">Not objectively scored</th><th scope="col">Average response time</th><th scope="col">Additional stored errors</th></tr></thead>
+                <tbody>
+                @foreach (var category in Model.ResponseCategories)
+                {
+                    <tr>
+                        <th scope="row">@category.Category</th>
+                        <td>@category.ResponseCount</td>
+                        <td>@category.CorrectCount</td>
+                        <td>@category.ErrorCount</td>
+                        <td>@category.NotObjectivelyScoredCount</td>
+                        <td>@(category.AverageResponseTimeMilliseconds.HasValue ? $"{category.AverageResponseTimeMilliseconds.Value:N0} ms" : "Not recorded")</td>
+                        <td>@(category.AdditionalErrorCount.HasValue ? $"{category.AdditionalErrorCount.Value} {category.AdditionalErrorLabel}" : "Not recorded")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section class="mb-4" aria-labelledby="response-tagging-heading">
+    <h2 id="response-tagging-heading" class="h4 mb-2">Professional response classification</h2>
+    <p class="text-secondary">Apply one or more descriptive categories where appropriate. These tags are entered by a professional and do not produce an automated interpretation.</p>
+    @if (Model.ResponsesForTagging.Count == 0)
+    {
+        <p class="text-secondary">There are no individual response records to classify.</p>
+    }
+    else
+    {
+        @foreach (var response in Model.ResponsesForTagging)
+        {
+            <article class="admin-details-card mb-3" aria-labelledby="response-@response.ResponseId-heading">
+                <h3 id="response-@response.ResponseId-heading" class="h6">@response.QuestionType response</h3>
+                <p><strong>Prompt:</strong> @response.Prompt</p>
+                <p><strong>Submitted answer:</strong> @(string.IsNullOrWhiteSpace(response.SubmittedAnswer) ? "No text answer stored" : response.SubmittedAnswer)</p>
+                <form asp-action="SaveErrorCategories" asp-route-id="@Model.ReferralId" asp-route-responseId="@response.ResponseId" method="post">
+                    @Html.AntiForgeryToken()
+                    <fieldset>
+                        <legend class="form-label">Error categories</legend>
+                        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-2 mb-3">
+                        @foreach (var category in Model.AvailableErrorCategories)
+                        {
+                            var inputId = $"response-{response.ResponseId}-category-{category}";
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="@inputId" name="ErrorCategories" value="@category" checked="@response.ErrorCategories.Contains(category)" />
+                                    <label class="form-check-label" for="@inputId">@LexiAssist.Web.Models.Screening.ScreeningErrorCategoryDisplay.GetName(category)</label>
+                                </div>
+                            </div>
+                        }
+                        </div>
+                    </fieldset>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Save categories for this response</button>
+                </form>
+            </article>
+        }
+    }
+</section>
+
+<section class="mb-4" aria-labelledby="history-heading">
+    <h2 id="history-heading" class="h4 mb-3">Previous screening trend</h2>
+    @if (Model.PreviousScreenings.Count == 0)
+    {
+        <p class="text-secondary">No earlier completed screening records are available for comparison.</p>
+    }
+    else
+    {
+        <div class="table-responsive bg-white border rounded-3">
+            <table class="table align-middle mb-0">
+                <caption class="visually-hidden">Previous screening trend</caption>
+                <thead class="table-light"><tr><th scope="col">Completed (UTC)</th><th scope="col">Stored overall score</th><th scope="col">Stored risk/support tier</th></tr></thead>
+                <tbody>
+                @foreach (var previous in Model.PreviousScreenings)
+                {
+                    <tr>
+                        <th scope="row">@previous.ScreeningDateUtc.ToString("u")</th>
+                        <td>@(previous.OverallPercentage.HasValue ? $"{previous.OverallPercentage.Value:0.#}%" : "Not available")</td>
+                        <td>@(previous.RiskTier ?? "Not available")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section class="mb-4" aria-labelledby="recordings-heading">
+    <h2 id="recordings-heading" class="h4 mb-3">Audio snippet bank</h2>
+    <p class="text-secondary">Snippets are shown for flagged screening categories or professionally tagged responses. Playback is available only through an authorization-checked route.</p>
+    @if (Model.Recordings.Count == 0)
+    {
+        <p class="text-secondary">No recordings are available for flagged attempts in this screening.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled">
+        @foreach (var recording in Model.Recordings)
+        {
+            <li class="mb-3">
+                <article class="admin-details-card" aria-labelledby="snippet-@recording.ResponseId-@(recording.PrivateRecordingId ?? 0)-heading">
+                <h3 id="snippet-@recording.ResponseId-@(recording.PrivateRecordingId ?? 0)-heading" class="h6">@recording.CategoryName snippet</h3>
+                @if (!string.IsNullOrWhiteSpace(recording.ItemPrompt))
+                {
+                    <p class="mb-2"><strong>Related item:</strong> @recording.ItemPrompt</p>
+                }
+                @if (recording.ErrorCategories is { Count: > 0 })
+                {
+                    <p class="mb-2"><strong>Error categories:</strong>
+                        @foreach (var category in recording.ErrorCategories)
+                        {
+                            <span class="badge text-bg-light border">@LexiAssist.Web.Models.Screening.ScreeningErrorCategoryDisplay.GetName(category)</span>
+                        }
+                    </p>
+                }
+                else
+                {
+                    <p class="small text-secondary mb-2">Associated with a screening category flagged for professional review.</p>
+                }
+                @if (recording.DurationMilliseconds is { } recordingDuration)
+                {
+                    <span class="d-block text-secondary small">Duration: @TimeSpan.FromMilliseconds(recordingDuration).ToString(@"m\:ss")</span>
+                }
+                <audio controls preload="none" aria-label="Recording for @recording.CategoryName response">
+                    <source src="@(recording.PrivateRecordingId is int privateRecordingId
+                        ? Url.Action("Play", "LearnerAudioRecordings", new { id = privateRecordingId })
+                        : Url.Action("Recording", "PsychologistReferrals", new { id = Model.ReferralId, responseId = recording.ResponseId }))" type="@recording.ContentType" />
+                    Your browser does not support audio playback.
+                </audio>
+                @if (!string.IsNullOrWhiteSpace(recording.ProfessionalNote))
+                {
+                    <p class="mt-3 mb-1"><strong>Professional snippet note</strong></p>
+                    <p class="mb-1" style="white-space: pre-wrap">@recording.ProfessionalNote</p>
+                    @if (recording.ProfessionalNoteUpdatedAtUtc is { } noteUpdatedAt)
+                    {
+                        <p class="small text-secondary">Updated (UTC): @noteUpdatedAt.ToString("u")</p>
+                    }
+                }
+                <form asp-action="@(recording.PrivateRecordingId.HasValue ? "SaveRecordingNote" : "SaveResponseRecordingNote")"
+                      asp-route-id="@Model.ReferralId"
+                      asp-route-recordingId="@recording.PrivateRecordingId"
+                      asp-route-responseId="@recording.ResponseId"
+                      method="post" class="mt-3">
+                    @Html.AntiForgeryToken()
+                    <label class="form-label" for="snippet-note-@recording.ResponseId-@(recording.PrivateRecordingId ?? 0)">Professional note for this snippet</label>
+                    <textarea class="form-control" id="snippet-note-@recording.ResponseId-@(recording.PrivateRecordingId ?? 0)" name="ProfessionalNote" maxlength="500" rows="3">@recording.ProfessionalNote</textarea>
+                    <div class="form-text">Up to 500 characters. Saving a note does not change the original recording.</div>
+                    <button type="submit" class="btn btn-sm btn-outline-primary mt-2">Save snippet note</button>
+                </form>
+                </article>
+            </li>
+        }
+        </ul>
+    }
+    @if (Model.UnavailableRecordingCount > 0)
+    {
+        <p class="text-secondary">@Model.UnavailableRecordingCount stored recording reference(s) are unavailable for secure playback.</p>
+    }
+</section>
+
+<section class="admin-details-card mb-4" aria-labelledby="professional-notes-heading">
+    <h2 id="professional-notes-heading" class="h4">Professional notes</h2>
+    @if (string.IsNullOrWhiteSpace(Model.ProfessionalNotes))
+    {
+        <p class="text-secondary mb-0">No professional notes have been recorded.</p>
+    }
+    else
+    {
+        <p class="mb-0" style="white-space: pre-wrap">@Model.ProfessionalNotes</p>
+    }
+</section>

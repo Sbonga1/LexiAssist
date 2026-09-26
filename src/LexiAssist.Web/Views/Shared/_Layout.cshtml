@@ -1,0 +1,208 @@
+@using System.Globalization
+@using System.Security.Claims
+@using LexiAssist.Web.Models.Identity
+@using LexiAssist.Web.Services.Interfaces
+@inject IUserAccessibilityPreferenceService AccessibilityPreferenceService
+@{
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var accessibilityPreference = new UserAccessibilityPreference();
+
+    if (isAuthenticated && !string.IsNullOrWhiteSpace(userId))
+    {
+        accessibilityPreference = await AccessibilityPreferenceService.GetForUserAsync(userId);
+    }
+
+    var fontScale = accessibilityPreference.FontScale.ToString(CultureInfo.InvariantCulture);
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    var isLandingPage = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Index", StringComparison.OrdinalIgnoreCase);
+    var isAdminArea = isAuthenticated
+        && User.IsInRole(ApplicationRoles.Administrator)
+        && (currentController.StartsWith("Admin", StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(currentController, "Dashboard", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(currentAction, "Administrator", StringComparison.OrdinalIgnoreCase))
+            || (string.Equals(currentController, "Settings", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(currentAction, "Accessibility", StringComparison.OrdinalIgnoreCase)));
+}
+<!DOCTYPE html>
+<html lang="en"
+      style="--font-scale: @fontScale"
+      data-reading-background="@accessibilityPreference.BackgroundTheme"
+      data-font-scale="@fontScale"
+      data-increased-line-spacing="@(accessibilityPreference.IncreasedLineSpacing ? "true" : "false")"
+      data-reduce-motion="@(accessibilityPreference.ReduceMotion ? "true" : "false")"
+      data-user-authenticated="@(isAuthenticated ? "true" : "false")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - LexiAssist</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/LexiAssist.Web.styles.css" asp-append-version="true" />
+</head>
+<body class="@(isAdminArea ? "admin-shell" : isLandingPage ? "landing-shell" : string.Empty)">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    @if (isAdminArea)
+    {
+        <div class="admin-app-shell">
+            <aside id="admin-sidebar" class="admin-sidebar" aria-label="Administrator navigation">
+                <div class="admin-sidebar-header">
+                    <a class="admin-brand" asp-controller="Dashboard" asp-action="Administrator">
+                        <img class="brand-logo admin-brand-logo" src="~/images/branding/lexiassist-logo.png" alt="LexiAssist" />
+                        <span><small>Admin console</small></span>
+                    </a>
+                </div>
+
+                <nav class="admin-sidebar-nav">
+                    <p class="admin-nav-label">Workspace</p>
+                    <a class="admin-nav-link @(currentController == "Dashboard" ? "is-active" : string.Empty)" asp-controller="Dashboard" asp-action="Administrator">
+                        <span class="admin-nav-icon" aria-hidden="true">⌂</span><span>Dashboard</span>
+                    </a>
+
+                    <p class="admin-nav-label">Manage</p>
+                    <a class="admin-nav-link @(currentController == "AdminUsers" ? "is-active" : string.Empty)" asp-controller="AdminUsers" asp-action="Index">
+                        <span class="admin-nav-icon" aria-hidden="true">♙</span><span>Users</span>
+                    </a>
+                    <a class="admin-nav-link @(currentController == "AdminScreeningTests" || currentController == "AdminScreeningQuestions" ? "is-active" : string.Empty)" asp-controller="AdminScreeningTests" asp-action="Index">
+                        <span class="admin-nav-icon" aria-hidden="true">◫</span><span>Screening tests</span>
+                    </a>
+                    <a class="admin-nav-link @(currentController == "AdminScreeningReports" ? "is-active" : string.Empty)" asp-controller="AdminScreeningReports" asp-action="Index">
+                        <span class="admin-nav-icon" aria-hidden="true">▤</span><span>Screening reports</span>
+                    </a>
+                    <a class="admin-nav-link @(currentController == "AdminReferrals" ? "is-active" : string.Empty)" asp-controller="AdminReferrals" asp-action="Index">
+                        <span class="admin-nav-icon" aria-hidden="true">↗</span><span>Referrals</span>
+                    </a>
+                    <a class="admin-nav-link @(currentController == "AdminEducationalResources" ? "is-active" : string.Empty)" asp-controller="AdminEducationalResources" asp-action="Index">
+                        <span class="admin-nav-icon" aria-hidden="true">▦</span><span>Resources</span>
+                    </a>
+
+                    <p class="admin-nav-label">System</p>
+                    <a class="admin-nav-link @(currentController == "AdminAudit" ? "is-active" : string.Empty)" asp-controller="AdminAudit" asp-action="Index">
+                        <span class="admin-nav-icon" aria-hidden="true">◒</span><span>Audit log</span>
+                    </a>
+                    <a class="admin-nav-link @(currentController == "Settings" ? "is-active" : string.Empty)" asp-controller="Settings" asp-action="Accessibility">
+                        <span class="admin-nav-icon" aria-hidden="true">⚙</span><span>Accessibility</span>
+                    </a>
+                </nav>
+
+                <div class="admin-sidebar-footer">
+                    <a class="admin-sidebar-public-link" asp-controller="Home" asp-action="Index"><span aria-hidden="true">↗</span> View public site</a>
+                    <div class="admin-user-card">
+                        <span class="admin-user-avatar" aria-hidden="true">A</span>
+                        <span class="admin-user-copy"><strong>Administrator</strong><small>@User.Identity?.Name</small></span>
+                        <form id="admin-logout-form" asp-controller="Account" asp-action="Logout" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="button" class="admin-signout" aria-label="Sign out" aria-controls="logout-confirm-modal" aria-haspopup="dialog" data-bs-toggle="modal" data-bs-target="#logout-confirm-modal">
+                                <span aria-hidden="true">⇥</span><span class="visually-hidden">Sign out</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="modal fade logout-confirm-modal" id="logout-confirm-modal" tabindex="-1" role="dialog" aria-labelledby="logout-confirm-title" aria-describedby="logout-confirm-description logout-confirm-note">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-body">
+                            <button type="button" class="btn-close logout-confirm-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <div class="logout-confirm-icon" aria-hidden="true">⇥</div>
+                            <h2 id="logout-confirm-title" class="logout-confirm-title">Sign out of LexiAssist?</h2>
+                            <p id="logout-confirm-description" class="logout-confirm-message">Are you sure you want to end your session?</p>
+                            <p id="logout-confirm-note" class="logout-confirm-note">You will need to sign in again to access your administrator workspace.</p>
+                            <div class="logout-confirm-actions">
+                                <button type="button" class="logout-confirm-cancel" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="logout-confirm-submit" form="admin-logout-form">Sign out</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="admin-sidebar-backdrop" class="admin-sidebar-backdrop" type="button" aria-label="Close administrator navigation"></button>
+
+            <div class="admin-workspace">
+                <header class="admin-topbar">
+                    <div class="admin-topbar-left">
+                        <button id="admin-sidebar-toggle" class="admin-sidebar-toggle" type="button" aria-controls="admin-sidebar" aria-expanded="false" aria-label="Open administrator navigation">
+                            <span aria-hidden="true">☰</span>
+                        </button>
+                        <span class="admin-topbar-divider" aria-hidden="true"></span>
+                        <div>
+                            <p class="admin-topbar-kicker">Administrator</p>
+                            <p class="admin-topbar-title">@ViewData["Title"]</p>
+                        </div>
+                    </div>
+                    <div class="admin-topbar-actions">
+                        <ul class="admin-topbar-links">
+                            @await Component.InvokeAsync("NotificationBell")
+                        </ul>
+                        <span class="admin-topbar-role">System control center</span>
+                    </div>
+                </header>
+
+                <main id="main-content" class="admin-content">
+                    @RenderBody()
+                </main>
+
+                <footer class="admin-footer">
+                    <span>LexiAssist administration</span>
+                    <span>Private workspace · 2026</span>
+                </footer>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="app-shell">
+            <header class="site-header">
+                <nav class="navbar navbar-expand-lg public-navbar" aria-label="Main navigation">
+                    <div class="container-xl">
+                        <a class="navbar-brand site-brand" asp-controller="Home" asp-action="Index">
+                            <img class="brand-logo site-brand-logo" src="~/images/branding/lexiassist-logo.png" alt="LexiAssist" />
+                        </a>
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#site-navigation" aria-controls="site-navigation"
+                                aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div class="collapse navbar-collapse public-navbar__collapse" id="site-navigation">
+                            <partial name="_LoginPartial" />
+                            @if (!isAuthenticated)
+                            {
+                                <div class="reading-background-control public-navbar__preferences">
+                                    <span class="reading-background-icon" aria-hidden="true">☼</span>
+                                    <label for="reading-background" class="form-label">Reading background</label>
+                                    <select id="reading-background" class="form-select form-select-sm" aria-label="Choose a reading background">
+                                        <option value="standard-light">Standard Light</option>
+                                        <option value="warm-cream">Warm Cream</option>
+                                        <option value="soft-blue">Soft Blue</option>
+                                        <option value="muted-gray">Muted Gray</option>
+                                    </select>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </nav>
+            </header>
+
+            <main id="main-content" class="site-main container-xl @(isLandingPage ? "landing-main" : string.Empty)">
+                @RenderBody()
+            </main>
+
+            <footer class="site-footer">
+                <div class="container-xl d-flex flex-wrap justify-content-between gap-2">
+                    <span>&copy; 2026 LexiAssist</span>
+                    <a asp-controller="Home" asp-action="Privacy">Privacy</a>
+                </div>
+            </footer>
+        </div>
+    }
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,170 @@
+@using LexiAssist.Web.Services
+@model LexiAssist.Web.ViewModels.AdminScreeningReports.AdminScreeningReportsIndexViewModel
+@{
+    ViewData["Title"] = "Screening reports";
+
+    string BuildPageUrl(int page)
+    {
+        var query = new List<string> { $"page={page}" };
+        if (!string.IsNullOrWhiteSpace(Model.SearchLearner))
+        {
+            query.Add($"searchLearner={Uri.EscapeDataString(Model.SearchLearner)}");
+        }
+
+        if (Model.FromDate.HasValue)
+        {
+            query.Add($"fromDate={Model.FromDate.Value:yyyy-MM-dd}");
+        }
+
+        if (Model.ToDate.HasValue)
+        {
+            query.Add($"toDate={Model.ToDate.Value:yyyy-MM-dd}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(Model.RiskTier))
+        {
+            query.Add($"riskTier={Uri.EscapeDataString(Model.RiskTier)}");
+        }
+
+        return $"/admin/screening-reports?{string.Join("&", query)}";
+    }
+}
+
+<main class="admin-screening-reports-page">
+    <header class="admin-screening-reports-heading">
+        <p class="admin-eyebrow">Administration</p>
+        <h1>Completed screening reports</h1>
+        <p class="admin-screening-reports-intro">Search and open a report to review its saved category results.</p>
+    </header>
+
+    <div asp-validation-summary="ModelOnly" class="admin-screening-reports-validation" role="alert"></div>
+
+    <form asp-action="Index" method="get" class="admin-screening-reports-filter" aria-label="Filter screening reports">
+        <div class="admin-screening-reports-search">
+            <label for="searchLearner" class="form-label">Search learner</label>
+            <input id="searchLearner" name="searchLearner" value="@Model.SearchLearner" class="form-control" placeholder="Name or email" autocomplete="off" />
+        </div>
+        <div>
+            <label for="fromDate" class="form-label">From date</label>
+            <input id="fromDate" name="fromDate" type="date" value="@Model.FromDate?.ToString("yyyy-MM-dd")" class="form-control" />
+        </div>
+        <div>
+            <label for="toDate" class="form-label">To date</label>
+            <input id="toDate" name="toDate" type="date" value="@Model.ToDate?.ToString("yyyy-MM-dd")" class="form-control" />
+        </div>
+        <div>
+            <label for="riskTier" class="form-label">Support tier</label>
+            <select id="riskTier" name="riskTier" class="form-select">
+                <option value="">All tiers</option>
+                <option value="Green" selected="@(Model.RiskTier == "Green")">Green</option>
+                <option value="Amber" selected="@(Model.RiskTier == "Amber")">Amber</option>
+                <option value="Red" selected="@(Model.RiskTier == "Red")">Red</option>
+                <option value="Unclassified" selected="@(Model.RiskTier == "Unclassified")">Unclassified</option>
+            </select>
+        </div>
+        <div class="admin-screening-reports-filter-actions">
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Clear</a>
+        </div>
+    </form>
+
+    <section class="admin-screening-reports-table-surface" aria-label="Completed screening reports">
+        <div class="admin-screening-reports-table-wrap">
+            <table class="admin-screening-reports-table">
+                <caption class="visually-hidden">Completed screening reports</caption>
+                <thead>
+                    <tr>
+                        <th scope="col" class="admin-screening-reports-col-learner">Learner</th>
+                        <th scope="col" class="admin-screening-reports-col-date">Report date (CAT)</th>
+                        <th scope="col" class="admin-screening-reports-col-tier">Support tier</th>
+                        <th scope="col" class="admin-screening-reports-col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Reports.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" class="admin-screening-reports-empty">
+                            <strong>No screening reports match your current filters.</strong>
+                            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Clear filters</a>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var report in Model.Reports)
+                    {
+                        var tier = string.IsNullOrWhiteSpace(report.RiskTier) ? "Unclassified" : report.RiskTier;
+                        var tierClass = tier switch
+                        {
+                            "Green" => "is-green",
+                            "Amber" => "is-amber",
+                            "Red" => "is-red",
+                            _ => "is-unclassified"
+                        };
+                        var catDate = SouthAfricaTimeFormatter.Format(report.GeneratedAtUtc);
+                        catDate = catDate.Length > 9 ? $"{catDate[..16]} CAT" : catDate;
+                        <tr>
+                            <td class="admin-screening-reports-learner">@report.LearnerName</td>
+                            <td class="admin-screening-reports-date"><time datetime="@report.GeneratedAtUtc.ToString("O")">@catDate</time></td>
+                            <td>
+                                <span class="admin-screening-reports-tier @tierClass">
+                                    <span class="admin-screening-reports-tier-dot" aria-hidden="true"></span>
+                                    @tier
+                                </span>
+                            </td>
+                            <td class="admin-screening-reports-actions">
+                                <a asp-action="Details" asp-route-id="@report.Id" class="btn btn-outline-primary">Open report</a>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="admin-screening-reports-table-footer">
+            <p class="admin-screening-reports-summary">Showing @Model.FirstItemNumber–@Model.LastItemNumber of @Model.TotalCount reports</p>
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="Screening report pages">
+                    <ul class="pagination admin-screening-reports-pagination mb-0">
+                        <li class="page-item @(!Model.HasPreviousPage ? "disabled" : "")">
+                            @if (Model.HasPreviousPage)
+                            {
+                                <a class="page-link" href="@BuildPageUrl(Model.PageNumber - 1)">Previous</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Previous</span>
+                            }
+                        </li>
+                        @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+                        {
+                            <li class="page-item @(pageNumber == Model.PageNumber ? "active" : "")">
+                                @if (pageNumber == Model.PageNumber)
+                                {
+                                    <span class="page-link" aria-current="page">@pageNumber</span>
+                                }
+                                else
+                                {
+                                    <a class="page-link" href="@BuildPageUrl(pageNumber)">@pageNumber</a>
+                                }
+                            </li>
+                        }
+                        <li class="page-item @(!Model.HasNextPage ? "disabled" : "")">
+                            @if (Model.HasNextPage)
+                            {
+                                <a class="page-link" href="@BuildPageUrl(Model.PageNumber + 1)">Next</a>
+                            }
+                            else
+                            {
+                                <span class="page-link" aria-disabled="true">Next</span>
+                            }
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </footer>
+    </section>
+</main>
