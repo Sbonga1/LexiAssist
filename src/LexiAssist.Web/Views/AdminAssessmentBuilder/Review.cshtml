@@ -1,0 +1,177 @@
+@model LexiAssist.Web.Services.Interfaces.AssessmentReadinessResult
+@using LexiAssist.Web.Services.Interfaces
+@{
+    ViewData["Title"] = "Review assessment";
+}
+
+<section class="assessment-stage assessment-review" data-assessment-builder-root aria-labelledby="review-heading">
+    <header class="assessment-builder-workflow">
+        <a asp-action="Configure" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-back">← <span>Back to Configure</span></a>
+        <nav class="assessment-builder-steps" aria-label="Assessment authoring steps">
+            <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId">Build</a>
+            <a asp-action="Configure" asp-route-testId="@Model.ScreeningTestId">Configure</a>
+            <span class="is-current" aria-current="step">Review</span>
+        </nav>
+        <a asp-action="Preview" asp-route-testId="@Model.ScreeningTestId" asp-route-returnToReview="true" class="assessment-builder-button assessment-builder-button-secondary">Candidate preview</a>
+    </header>
+    <div class="alert alert-info" data-builder-feedback role="status" aria-live="polite" hidden></div>
+
+    <header class="assessment-stage-heading assessment-review-heading">
+        <div>
+            <p class="auth-eyebrow">Administration · Final review</p>
+            <h1 id="review-heading">Review assessment</h1>
+            <p>Confirm the learner-facing questions and resolve any blockers before activation.</p>
+        </div>
+        <div class="assessment-review-status @(Model.IsReady ? "is-ready" : "is-blocked")" role="status" aria-live="polite">
+            <span aria-hidden="true">@(Model.IsReady ? "✓" : "!")</span>
+            <strong>@(Model.IsReady ? "READY TO ACTIVATE" : "ACTION REQUIRED")</strong>
+        </div>
+    </header>
+
+    <div class="assessment-review-grid">
+        <main class="assessment-review-main">
+            <section class="assessment-stage-card" aria-labelledby="review-summary-heading">
+                <div class="assessment-stage-card-heading">
+                    <span class="assessment-stage-icon" aria-hidden="true">▤</span>
+                    <div><h2 id="review-summary-heading">Assessment summary</h2><p>@Model.Name</p></div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.Description))
+                {
+                    <p class="assessment-stage-summary-description">@Model.Description</p>
+                }
+                <dl class="assessment-review-counts">
+                    <div><dt>Current status</dt><dd>@(Model.IsActive ? "Active" : "Inactive · Draft")</dd></div>
+                    <div><dt>Total questions</dt><dd>@Model.TotalQuestionCount</dd></div>
+                    <div><dt>Active</dt><dd>@Model.ActiveQuestionCount</dd></div>
+                    <div><dt>Inactive drafts</dt><dd>@Model.InactiveQuestionCount</dd></div>
+                </dl>
+                @if (Model.QuestionTypeCounts.Count > 0)
+                {
+                    <div class="assessment-review-types">
+                        <h3>Question types</h3>
+                        <ul>
+                            @foreach (var type in Model.QuestionTypeCounts)
+                            {
+                                <li><span>@type.Name</span><strong>@type.Count</strong></li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </section>
+
+            <section class="assessment-stage-card assessment-review-questions" aria-labelledby="review-questions-heading">
+                <div class="assessment-stage-card-heading">
+                    <span class="assessment-stage-icon" aria-hidden="true">☷</span>
+                    <div><h2 id="review-questions-heading">Questions</h2><p>Final order and readiness for each question</p></div>
+                    <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-stage-text-link">Edit in Builder</a>
+                </div>
+                @if (Model.Questions.Count == 0)
+                {
+                    <div class="assessment-review-empty"><strong>No questions have been added.</strong><a asp-action="Index" asp-route-testId="@Model.ScreeningTestId">Go to Builder</a></div>
+                }
+                else
+                {
+                    <ol class="assessment-review-question-list">
+                        @foreach (var question in Model.Questions)
+                        {
+                            var questionStatus = question.IsActive ? question.Severity : AssessmentReadinessSeverity.Warning;
+                            var statusClass = questionStatus == AssessmentReadinessSeverity.Passed ? "is-passed" : questionStatus == AssessmentReadinessSeverity.Warning ? "is-warning" : "is-blocking";
+                            <li class="assessment-review-question @statusClass">
+                                <span class="assessment-review-order">@question.SortOrder</span>
+                                <div class="assessment-review-question-content">
+                                    <p class="assessment-review-question-type">@question.QuestionTypeName <span aria-hidden="true">·</span> @(question.IsActive ? "Active" : "Inactive / Draft")</p>
+                                    <h3>@(string.IsNullOrWhiteSpace(question.Prompt) ? "Question prompt is missing" : question.Prompt)</h3>
+                                    @if (!question.IsActive)
+                                    {
+                                        <p class="assessment-review-question-note">Inactive draft · excluded from learners until activated in Builder.</p>
+                                    }
+                                    else if (question.Issues.Count > 0)
+                                    {
+                                        <ul class="assessment-review-issues">
+                                            @foreach (var issue in question.Issues)
+                                            {
+                                                <li>@issue</li>
+                                            }
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <p class="assessment-review-question-note">Ready for the learner runtime.</p>
+                                    }
+                                </div>
+                                <span class="assessment-review-question-state">@(question.IsActive ? question.Severity == AssessmentReadinessSeverity.Passed ? "Ready" : "Blocked" : "Draft")</span>
+                                <a href="@question.EditUrl" class="assessment-stage-text-link">Edit</a>
+                            </li>
+                        }
+                    </ol>
+                }
+            </section>
+        </main>
+
+        <aside class="assessment-review-aside">
+            <section class="assessment-stage-card assessment-readiness-card" aria-labelledby="review-readiness-heading">
+                <div class="assessment-readiness-heading">
+                    <div><p class="assessment-stage-kicker">READINESS</p><h2 id="review-readiness-heading">@(Model.IsReady ? "Ready to activate" : "Action required")</h2></div>
+                    <span class="assessment-readiness-mark @(Model.IsReady ? "is-ready" : "is-blocked")" aria-hidden="true">@(Model.IsReady ? "✓" : "!")</span>
+                </div>
+                <ul class="assessment-readiness-list">
+                    @foreach (var check in Model.Checks)
+                    {
+                        var statusClass = check.Severity == AssessmentReadinessSeverity.Passed ? "is-passed" : check.Severity == AssessmentReadinessSeverity.Warning ? "is-warning" : "is-blocking";
+                        var statusText = check.Severity == AssessmentReadinessSeverity.Passed ? "Passed" : check.Severity == AssessmentReadinessSeverity.Warning ? "Info" : "Fix";
+                        <li class="@statusClass">
+                            <span class="assessment-readiness-status">@statusText</span>
+                            <div><strong>@check.Label</strong>@if (!string.IsNullOrWhiteSpace(check.Detail)) { <p>@check.Detail</p> }</div>
+                            @if (!string.IsNullOrWhiteSpace(check.FixUrl)) { <a href="@check.FixUrl">@check.FixLabel</a> }
+                        </li>
+                    }
+                </ul>
+            </section>
+
+            <section class="assessment-stage-card" aria-labelledby="review-config-summary-heading">
+                <h2 id="review-config-summary-heading">Configuration summary</h2>
+                <dl class="assessment-stage-facts">
+                    <div><dt>Logical sections</dt><dd>1</dd></div>
+                    <div><dt>Question order</dt><dd>Builder order</dd></div>
+                    <div><dt>Inactive drafts</dt><dd>Excluded from learners</dd></div>
+                </dl>
+                <p class="assessment-stage-muted">No whole-assessment timer, attempt limit, or progress setting is currently persisted. Question-level behavior remains with each question.</p>
+            </section>
+
+            <section class="assessment-stage-card assessment-preview-card" aria-labelledby="review-preview-heading">
+                <h2 id="review-preview-heading">Candidate Preview</h2>
+                <p>Preview the active questions in order. This read-only preview does not create an attempt, response, report, or recording.</p>
+                <a asp-action="Preview" asp-route-testId="@Model.ScreeningTestId" asp-route-returnToReview="true" class="assessment-builder-button assessment-builder-button-secondary">Open Candidate Preview</a>
+            </section>
+
+            <section class="assessment-stage-card assessment-activation-card" aria-labelledby="review-activation-heading">
+                <h2 id="review-activation-heading">Activation</h2>
+                @if (!Model.IsActive)
+                {
+                    <p>Activation makes this assessment available to learners. Only active questions will be included.</p>
+                    <form asp-action="Activate" asp-route-testId="@Model.ScreeningTestId" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="assessment-builder-button assessment-builder-button-primary" disabled="@(!Model.IsReady)">Activate assessment</button>
+                    </form>
+                    @if (!Model.IsReady)
+                    {
+                        <p class="assessment-stage-inline-error">@Model.ActivationFeedback</p>
+                    }
+                }
+                else
+                {
+                    <p class="assessment-review-active-note">This assessment is active.</p>
+                    <form asp-action="Deactivate" asp-route-testId="@Model.ScreeningTestId" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="assessment-builder-button assessment-builder-button-danger">Deactivate assessment</button>
+                    </form>
+                }
+                <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-stage-text-link">Return to Build</a>
+            </section>
+        </aside>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/assessment-builder-actions.js" asp-append-version="true"></script>
+}

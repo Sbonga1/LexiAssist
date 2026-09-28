@@ -22,9 +22,16 @@
         && User.IsInRole(ApplicationRoles.Administrator)
         && (currentController.StartsWith("Admin", StringComparison.OrdinalIgnoreCase)
             || (string.Equals(currentController, "Dashboard", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(currentAction, "Administrator", StringComparison.OrdinalIgnoreCase))
-            || (string.Equals(currentController, "Settings", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(currentAction, "Accessibility", StringComparison.OrdinalIgnoreCase)));
+                && string.Equals(currentAction, "Administrator", StringComparison.OrdinalIgnoreCase)));
+    var isLearnerArea = isAuthenticated
+        && User.IsInRole(ApplicationRoles.Learner)
+        && (string.Equals(currentController, "Dashboard", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentController, "Screening", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentController, "Activities", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentController, "Progress", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentController, "EducationalResources", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentController, "Notifications", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentController, "Settings", StringComparison.OrdinalIgnoreCase));
 }
 <!DOCTYPE html>
 <html lang="en"
@@ -41,9 +48,17 @@
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (isLearnerArea)
+    {
+        <link rel="stylesheet" href="~/css/learner-experience.css" asp-append-version="true" />
+    }
+    @if (ViewData["AssessmentWorkspace"] is true)
+    {
+        <link rel="stylesheet" href="~/css/assessment-workspace.css" asp-append-version="true" />
+    }
     <link rel="stylesheet" href="~/LexiAssist.Web.styles.css" asp-append-version="true" />
 </head>
-<body class="@(isAdminArea ? "admin-shell" : isLandingPage ? "landing-shell" : string.Empty)">
+<body class="@(ViewData["AssessmentWorkspace"] is true ? "assessment-workspace-shell " : string.Empty)@(isAdminArea ? "admin-shell" : isLandingPage ? "landing-shell" : isLearnerArea ? "learner-shell" : string.Empty)">
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
     @if (isAdminArea)
@@ -67,7 +82,7 @@
                     <a class="admin-nav-link @(currentController == "AdminUsers" ? "is-active" : string.Empty)" asp-controller="AdminUsers" asp-action="Index">
                         <span class="admin-nav-icon" aria-hidden="true">♙</span><span>Users</span>
                     </a>
-                    <a class="admin-nav-link @(currentController == "AdminScreeningTests" || currentController == "AdminScreeningQuestions" ? "is-active" : string.Empty)" asp-controller="AdminScreeningTests" asp-action="Index">
+                    <a class="admin-nav-link @(currentController == "AdminScreeningTests" || currentController == "AdminScreeningQuestions" || currentController == "AdminAssessmentBuilder" ? "is-active" : string.Empty)" asp-controller="AdminScreeningTests" asp-action="Index">
                         <span class="admin-nav-icon" aria-hidden="true">◫</span><span>Screening tests</span>
                     </a>
                     <a class="admin-nav-link @(currentController == "AdminScreeningReports" ? "is-active" : string.Empty)" asp-controller="AdminScreeningReports" asp-action="Index">
@@ -83,9 +98,6 @@
                     <p class="admin-nav-label">System</p>
                     <a class="admin-nav-link @(currentController == "AdminAudit" ? "is-active" : string.Empty)" asp-controller="AdminAudit" asp-action="Index">
                         <span class="admin-nav-icon" aria-hidden="true">◒</span><span>Audit log</span>
-                    </a>
-                    <a class="admin-nav-link @(currentController == "Settings" ? "is-active" : string.Empty)" asp-controller="Settings" asp-action="Accessibility">
-                        <span class="admin-nav-icon" aria-hidden="true">⚙</span><span>Accessibility</span>
                     </a>
                 </nav>
 
@@ -169,7 +181,14 @@
                             <span class="navbar-toggler-icon"></span>
                         </button>
                         <div class="collapse navbar-collapse public-navbar__collapse" id="site-navigation">
-                            <partial name="_LoginPartial" />
+                            @if (isLearnerArea)
+                            {
+                                <partial name="_LearnerNavigation" />
+                            }
+                            else
+                            {
+                                <partial name="_LoginPartial" />
+                            }
                             @if (!isAuthenticated)
                             {
                                 <div class="reading-background-control public-navbar__preferences">
@@ -188,7 +207,7 @@
                 </nav>
             </header>
 
-            <main id="main-content" class="site-main container-xl @(isLandingPage ? "landing-main" : string.Empty)">
+            <main id="main-content" class="site-main container-xl @(isLandingPage ? "landing-main" : string.Empty) @(isLearnerArea ? "learner-main" : string.Empty)">
                 @RenderBody()
             </main>
 

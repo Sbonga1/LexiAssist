@@ -30,10 +30,15 @@ public static class AuditActions
     public const string ScreeningTestDeactivated = "ScreeningTest.Deactivated";
     public const string ScreeningTestReordered = "ScreeningTest.Reordered";
     public const string ScreeningQuestionCreated = "ScreeningQuestion.Created";
+    public const string ScreeningQuestionCopied = "ScreeningQuestion.Copied";
     public const string ScreeningQuestionUpdated = "ScreeningQuestion.Updated";
     public const string ScreeningQuestionActivated = "ScreeningQuestion.Activated";
     public const string ScreeningQuestionDeactivated = "ScreeningQuestion.Deactivated";
     public const string ScreeningQuestionReordered = "ScreeningQuestion.Reordered";
+    public const string ListeningAudioRecorded = "ListeningAudio.Recorded";
+    public const string ListeningAudioUploaded = "ListeningAudio.Uploaded";
+    public const string ListeningAudioReplaced = "ListeningAudio.Replaced";
+    public const string ListeningAudioRemoved = "ListeningAudio.Removed";
     public const string ReferralAssigned = "Referral.Assigned";
     public const string PsychologistReportAccessed = "Psychologist.ReportAccessed";
     public const string RecordingAccessed = "Recording.Accessed";

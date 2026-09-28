@@ -16,9 +16,15 @@ public sealed class AdminScreeningQuestionFormViewModel
     [Display(Name = "Question type")]
     public ScreeningQuestionType QuestionType { get; set; } = ScreeningQuestionType.MultipleChoice;
 
+    [Range(0.1, 100, ErrorMessage = "Enter a question weight from 0.1 to 100.")]
+    [Display(Name = "Question weight")]
+    public double Weight { get; set; } = 1.0;
+
     [StringLength(2000)]
     [Display(Name = "Correct answer")]
     public string? CorrectAnswer { get; set; }
+
+    public string? SelectedCorrectAnswer { get; set; }
 
     [StringLength(8000)]
     [DataType(DataType.MultilineText)]
@@ -29,6 +35,10 @@ public sealed class AdminScreeningQuestionFormViewModel
     [DataType(DataType.MultilineText)]
     [Display(Name = "Answer choices (one per line)")]
     public string? ChoiceOptionsText { get; set; }
+
+    public List<string> AnswerOptions { get; set; } = [string.Empty, string.Empty];
+
+    public bool ConfirmTypeChange { get; set; }
 
     [StringLength(8000)]
     [DataType(DataType.MultilineText)]
@@ -78,6 +88,23 @@ public sealed class AdminScreeningQuestionFormViewModel
     [StringLength(255)]
     [Display(Name = "Audio file name")]
     public string? AudioPath { get; set; }
+
+    [Display(Name = "Audio source")]
+    public string AudioSourceMode { get; set; } = "upload";
+
+    [Display(Name = "Listening response type")]
+    public string ListeningResponseType { get; set; } = "multiple-choice";
+
+    public bool ListeningComposerEnabled { get; set; }
+
+    [StringLength(12000)]
+    [DataType(DataType.MultilineText)]
+    [Display(Name = "Accessibility transcript")]
+    public string? Transcript { get; set; }
+
+    [Range(1, 120, ErrorMessage = "Audio must be no longer than two minutes.")]
+    [Display(Name = "Audio duration (seconds)")]
+    public int? AudioDurationSeconds { get; set; }
 
     [Range(0, 20, ErrorMessage = "Enter zero to 20 additional replays, or leave blank for unlimited replays.")]
     [Display(Name = "Maximum additional audio replays (optional)")]

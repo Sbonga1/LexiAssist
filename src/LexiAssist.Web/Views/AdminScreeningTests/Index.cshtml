@@ -99,7 +99,7 @@
                             <td>
                                 <div class="admin-screening-tests-actions">
                                     <a asp-action="Details" asp-route-id="@test.Id" class="admin-screening-tests-action admin-screening-tests-action-neutral">View</a>
-                                    <a asp-action="Edit" asp-route-id="@test.Id" class="admin-screening-tests-action admin-screening-tests-action-neutral">Edit</a>
+                                    <a asp-controller="AdminAssessmentBuilder" asp-action="Details" asp-route-testId="@test.Id" class="admin-screening-tests-action admin-screening-tests-action-neutral">Edit in builder</a>
                                     @if (test.IsActive)
                                     {
                                         <form asp-action="Deactivate" asp-route-id="@test.Id" method="post">

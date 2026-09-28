@@ -8,6 +8,7 @@ using LexiAssist.Web.Models.Identity;
 using LexiAssist.Web.Models.Screening;
 using LexiAssist.Web.Services;
 using LexiAssist.Web.Services.Interfaces;
+using LexiAssist.Web.ViewModels.AssessmentBuilder;
 using LexiAssist.Web.ViewModels.AdminScreeningTests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +18,11 @@ namespace LexiAssist.Web.Controllers;
 
 [Authorize(Roles = ApplicationRoles.Administrator)]
 [Route("admin/screening-tests/{testId:int}/questions")]
-public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbContext, IAuditService auditService) : Controller
+public sealed class AdminScreeningQuestionsController(
+    ApplicationDbContext dbContext,
+    IAuditService auditService,
+    IAssessmentDraftGenerator draftGenerator,
+    ListeningAudioService listeningAudioService) : Controller
 {
     private static readonly JsonSerializerOptions MetadataJsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -55,7 +60,7 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
     }
 
     [HttpGet("create")]
-    public async Task<IActionResult> Create(int testId)
+    public async Task<IActionResult> Create(int testId, bool returnToBuilder = false, int returnPage = 1)
     {
         var screeningTest = await FindScreeningTestAsync(testId);
         if (screeningTest is null)
@@ -63,13 +68,18 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             return NotFound();
         }
 
-        SetTestContext(screeningTest);
-        return View(new AdminScreeningQuestionFormViewModel());
+        SetTestContext(screeningTest, returnToBuilder, returnPage);
+        ViewData["QuestionMode"] = "create";
+        return View("Authoring", new AdminScreeningQuestionFormViewModel
+        {
+            QuestionType = ScreeningQuestionType.MultipleChoice,
+            AnswerOptions = [string.Empty, string.Empty]
+        });
     }
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(int testId, AdminScreeningQuestionFormViewModel model)
+    public async Task<IActionResult> Create(int testId, AdminScreeningQuestionFormViewModel model, bool returnToBuilder = false, int returnPage = 1, string? submitMode = null)
     {
         var screeningTest = await FindScreeningTestAsync(testId);
         if (screeningTest is null)
@@ -77,11 +87,19 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             return NotFound();
         }
 
-        SetTestContext(screeningTest);
+        SetTestContext(screeningTest, returnToBuilder, returnPage);
+        ViewData["QuestionMode"] = "create";
+        NormalizeChoiceOptions(model);
+        if (string.Equals(submitMode, "preview", StringComparison.OrdinalIgnoreCase))
+        {
+            return BuildCandidatePreview(screeningTest, model,
+                Url.Action(nameof(Create), new { testId, returnToBuilder = true, returnPage }));
+        }
+
         ValidateQuestionSpecificFields(model);
         if (!ModelState.IsValid)
         {
-            return View(model);
+            return View("Authoring", model);
         }
 
         var question = new ScreeningQuestion
@@ -91,28 +109,45 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             QuestionType = model.QuestionType,
             CorrectAnswer = NormalizeOptionalText(GetCorrectAnswer(model)),
             AcceptedAnswersJson = SerializeAcceptedAnswers(model),
-            Weight = 1.0,
+            Weight = model.Weight,
             SortOrder = (await dbContext.ScreeningQuestions
                 .Where(item => item.ScreeningTestId == screeningTest.Id)
                 .MaxAsync(item => (int?)item.SortOrder) ?? 0) + 1,
-            IsActive = true,
+            IsActive = false,
             AudioPath = GetAudioPath(model),
             ImagePath = GetImagePath(model),
             MetadataJson = SerializeMetadata(model),
-            AllowsAudioRecording = model.AllowsAudioRecording
+            AllowsAudioRecording = model.AllowsAudioRecording && SupportsLearnerRecording(model.QuestionType)
         };
 
         dbContext.ScreeningQuestions.Add(question);
         await dbContext.SaveChangesAsync();
         await auditService.RecordAsync(AuditActions.ScreeningQuestionCreated, AuditEntityTypes.ScreeningQuestion, question.Id.ToString(), true,
             new { question.ScreeningTestId, QuestionType = question.QuestionType.ToString() });
+        if (question.QuestionType == ScreeningQuestionType.ListeningResponse && !string.IsNullOrWhiteSpace(question.AudioPath))
+        {
+            await auditService.RecordAsync(
+                string.Equals(model.AudioSourceMode, "record", StringComparison.OrdinalIgnoreCase)
+                    ? AuditActions.ListeningAudioRecorded
+                    : AuditActions.ListeningAudioUploaded,
+                AuditEntityTypes.ScreeningQuestion,
+                question.Id.ToString(),
+                true,
+                new { question.ScreeningTestId, Source = model.AudioSourceMode });
+        }
 
-        TempData["StatusMessage"] = "The question was created.";
-        return RedirectToAction(nameof(Index), new { testId = screeningTest.Id });
+        TempData["StatusMessage"] = "The question was saved as an inactive draft. Review it, then activate it when it is ready.";
+        if (string.Equals(submitMode, "next", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["StatusMessage"] = "The question was saved as an inactive draft. Add the next question from the builder when you are ready.";
+            return RedirectToAction("Index", "AdminAssessmentBuilder", new { testId = screeningTest.Id, page = Math.Max(returnPage, 1) });
+        }
+
+        return RedirectToAction(nameof(Edit), new { testId = screeningTest.Id, questionId = question.Id, returnToBuilder = true, returnPage });
     }
 
     [HttpGet("{questionId:int}/edit")]
-    public async Task<IActionResult> Edit(int testId, int questionId)
+    public async Task<IActionResult> Edit(int testId, int questionId, bool returnToBuilder = false, int returnPage = 1)
     {
         var question = await FindQuestionAsync(testId, questionId, includeTest: true);
         if (question is null)
@@ -120,13 +155,103 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             return NotFound();
         }
 
-        SetTestContext(question.ScreeningTest);
-        return View(ToFormViewModel(question));
+        SetTestContext(question.ScreeningTest, returnToBuilder, returnPage);
+        ViewData["QuestionMode"] = "edit";
+        ViewData["OriginalQuestionType"] = (int)question.QuestionType;
+        ViewData["QuestionIsActive"] = question.IsActive;
+        return View("Authoring", ToFormViewModel(question));
+    }
+
+    [HttpPost("audio/upload")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadAudio(int testId, IFormFile? audioFile, int? questionId, string source = "upload")
+    {
+        if (!await dbContext.ScreeningTests.AnyAsync(test => test.Id == testId))
+        {
+            return NotFound();
+        }
+
+        if (questionId is int id && await FindQuestionAsync(testId, id) is null)
+        {
+            return NotFound();
+        }
+
+        var result = await listeningAudioService.SaveAsync(audioFile, source, HttpContext.RequestAborted);
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        if (questionId is int questionKey)
+        {
+            await auditService.RecordAsync(
+                string.Equals(source, "record", StringComparison.OrdinalIgnoreCase)
+                    ? AuditActions.ListeningAudioRecorded
+                    : AuditActions.ListeningAudioUploaded,
+                AuditEntityTypes.ScreeningQuestion,
+                questionKey.ToString(),
+                true,
+                new { Source = source, result.FileName, result.SizeBytes, result.DurationSeconds });
+        }
+
+        return Json(new
+        {
+            fileName = result.FileName,
+            contentType = result.ContentType,
+            sizeBytes = result.SizeBytes,
+            durationSeconds = result.DurationSeconds,
+            source,
+            previewUrl = Url.Action(nameof(AudioPreview), new { testId, fileName = result.FileName })
+        });
+    }
+
+    [HttpGet("audio/preview/{fileName}")]
+    public async Task<IActionResult> AudioPreview(int testId, string fileName)
+    {
+        var questionUsesFile = await dbContext.ScreeningQuestions.AsNoTracking()
+            .AnyAsync(question => question.ScreeningTestId == testId && question.AudioPath == fileName);
+        if (!questionUsesFile && !listeningAudioService.IsOwnedFile(fileName))
+        {
+            return NotFound();
+        }
+
+        if (!ScreeningAudioSource.TryResolve(fileName, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out var path, out var contentType))
+        {
+            return NotFound();
+        }
+
+        Response.Headers["Content-Disposition"] = "inline";
+        Response.Headers["Cache-Control"] = "private, no-store";
+        Response.ContentType = contentType;
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete), contentType, enableRangeProcessing: true);
+    }
+
+    [HttpPost("{questionId:int}/audio/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveAudio(int testId, int questionId)
+    {
+        var question = await FindQuestionAsync(testId, questionId);
+        if (question is null) return NotFound();
+        var oldPath = question.AudioPath;
+        if (question.QuestionType == ScreeningQuestionType.ListeningResponse)
+        {
+            question.AudioPath = null;
+            var metadata = DeserializeMetadata(question.MetadataJson);
+            metadata.AudioSource = null;
+            metadata.AudioDurationSeconds = null;
+            question.MetadataJson = SerializeMetadata(metadata);
+            await dbContext.SaveChangesAsync();
+            listeningAudioService.TryDeleteOwned(oldPath);
+            await auditService.RecordAsync(AuditActions.ListeningAudioRemoved, AuditEntityTypes.ScreeningQuestion, questionId.ToString(), true,
+                new { ScreeningTestId = testId });
+        }
+        return RedirectToAction(nameof(Edit), new { testId, questionId, returnToBuilder = true });
     }
 
     [HttpPost("{questionId:int}/edit")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int testId, int questionId, AdminScreeningQuestionFormViewModel model)
+    public async Task<IActionResult> Edit(int testId, int questionId, AdminScreeningQuestionFormViewModel model, bool returnToBuilder = false, int returnPage = 1, string? submitMode = null)
     {
         if (questionId != model.Id)
         {
@@ -139,32 +264,99 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             return NotFound();
         }
 
-        SetTestContext(question.ScreeningTest);
+        SetTestContext(question.ScreeningTest, returnToBuilder, returnPage);
+        NormalizeChoiceOptions(model);
+        if (string.Equals(submitMode, "preview", StringComparison.OrdinalIgnoreCase))
+        {
+            ViewData["QuestionIsActive"] = question.IsActive;
+            return BuildCandidatePreview(question.ScreeningTest, model,
+                Url.Action(nameof(Edit), new { testId, questionId, returnToBuilder = true, returnPage }));
+        }
+
+        if (question.QuestionType != model.QuestionType && HasQuestionTypeData(question) && !model.ConfirmTypeChange)
+        {
+            ModelState.AddModelError(nameof(model.QuestionType), "Changing question type clears settings stored for the current type. Select the new type again and confirm before saving.");
+        }
         ValidateQuestionSpecificFields(model);
         if (!ModelState.IsValid)
         {
-            return View(model);
+            ViewData["QuestionMode"] = "edit";
+            ViewData["OriginalQuestionType"] = (int)question.QuestionType;
+            ViewData["QuestionIsActive"] = question.IsActive;
+            return View("Authoring", model);
         }
 
+        var previousAudioPath = question.AudioPath;
         question.Prompt = model.Prompt.Trim();
         question.QuestionType = model.QuestionType;
+        question.Weight = model.Weight;
         question.CorrectAnswer = NormalizeOptionalText(GetCorrectAnswer(model));
         question.AcceptedAnswersJson = SerializeAcceptedAnswers(model);
         question.AudioPath = GetAudioPath(model);
         question.ImagePath = GetImagePath(model);
         question.MetadataJson = SerializeMetadata(model);
-        question.AllowsAudioRecording = model.AllowsAudioRecording;
+        question.AllowsAudioRecording = model.AllowsAudioRecording && SupportsLearnerRecording(model.QuestionType);
         await dbContext.SaveChangesAsync();
+        if (question.QuestionType == ScreeningQuestionType.ListeningResponse &&
+            !string.Equals(previousAudioPath, question.AudioPath, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(previousAudioPath))
+        {
+            listeningAudioService.TryDeleteOwned(previousAudioPath);
+            await auditService.RecordAsync(AuditActions.ListeningAudioReplaced, AuditEntityTypes.ScreeningQuestion, question.Id.ToString(), true,
+                new { question.ScreeningTestId, PreviousAudioPath = previousAudioPath });
+        }
         await auditService.RecordAsync(AuditActions.ScreeningQuestionUpdated, AuditEntityTypes.ScreeningQuestion, question.Id.ToString(), true,
             new { question.ScreeningTestId, QuestionType = question.QuestionType.ToString() });
 
-        TempData["StatusMessage"] = "The question was updated.";
-        return RedirectToAction(nameof(Index), new { testId });
+        TempData["StatusMessage"] = question.IsActive
+            ? "The question was updated. Its active status was preserved."
+            : "The inactive question draft was updated.";
+        if (string.Equals(submitMode, "next", StringComparison.OrdinalIgnoreCase))
+        {
+            var nextQuestionId = await dbContext.ScreeningQuestions.AsNoTracking()
+                .Where(item => item.ScreeningTestId == testId &&
+                               (item.SortOrder > question.SortOrder || item.SortOrder == question.SortOrder && item.Id > question.Id))
+                .OrderBy(item => item.SortOrder)
+                .ThenBy(item => item.Id)
+                .Select(item => (int?)item.Id)
+                .FirstOrDefaultAsync();
+            if (nextQuestionId is int nextId)
+            {
+                return RedirectToAction(nameof(Edit), new { testId, questionId = nextId, returnToBuilder = true, returnPage });
+            }
+
+            TempData["StatusMessage"] = "The last question was saved. You are back at the builder.";
+            return RedirectToAction("Index", "AdminAssessmentBuilder", new { testId, page = Math.Max(returnPage, 1) });
+        }
+
+        return RedirectToAction(nameof(Edit), new { testId, questionId, returnToBuilder = true, returnPage });
+    }
+
+    [HttpPost("{questionId:int}/duplicate")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Duplicate(int testId, int questionId, bool returnToBuilder = true, int returnPage = 1)
+    {
+        var source = await FindQuestionAsync(testId, questionId);
+        if (source is null)
+        {
+            return NotFound();
+        }
+
+        var sortOrder = (await dbContext.ScreeningQuestions
+            .Where(item => item.ScreeningTestId == testId)
+            .MaxAsync(item => (int?)item.SortOrder) ?? 0) + 1;
+        var copy = ScreeningQuestionCopyUtility.CopyToTest(source, testId, sortOrder);
+        dbContext.ScreeningQuestions.Add(copy);
+        await dbContext.SaveChangesAsync();
+        await auditService.RecordAsync(AuditActions.ScreeningQuestionCopied, AuditEntityTypes.ScreeningQuestion, copy.Id.ToString(), true,
+            new { copy.ScreeningTestId, SourceQuestionId = source.Id, QuestionType = copy.QuestionType.ToString(), Source = "Question duplicated in authoring workspace" });
+        TempData["StatusMessage"] = "A new inactive copy was created. Review it before activating.";
+        return RedirectToAction(nameof(Edit), new { testId, questionId = copy.Id, returnToBuilder = true, returnPage = Math.Max(returnPage, 1) });
     }
 
     [HttpPost("{questionId:int}/activate")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Activate(int testId, int questionId)
+    public async Task<IActionResult> Activate(int testId, int questionId, bool returnToBuilder = false, int returnPage = 1)
     {
         var question = await FindQuestionAsync(testId, questionId);
         if (question is null)
@@ -172,17 +364,24 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             return NotFound();
         }
 
+        if (question.QuestionType == ScreeningQuestionType.ListeningResponse &&
+            !ScreeningAudioSource.TryResolve(question.AudioPath, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out _, out _))
+        {
+            TempData["ErrorMessage"] = "A listening question must have a stored audio stimulus before it can be activated.";
+            return RedirectAfterQuestionEdit(testId, returnToBuilder, returnPage);
+        }
+
         question.IsActive = true;
         await dbContext.SaveChangesAsync();
         await auditService.RecordAsync(AuditActions.ScreeningQuestionActivated, AuditEntityTypes.ScreeningQuestion, questionId.ToString(), true,
             new { ScreeningTestId = testId });
         TempData["StatusMessage"] = "The question was activated.";
-        return RedirectToAction(nameof(Index), new { testId });
+        return RedirectAfterQuestionEdit(testId, returnToBuilder, returnPage);
     }
 
     [HttpPost("{questionId:int}/deactivate")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Deactivate(int testId, int questionId)
+    public async Task<IActionResult> Deactivate(int testId, int questionId, bool returnToBuilder = false, int returnPage = 1)
     {
         var question = await FindQuestionAsync(testId, questionId);
         if (question is null)
@@ -195,12 +394,12 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
         await auditService.RecordAsync(AuditActions.ScreeningQuestionDeactivated, AuditEntityTypes.ScreeningQuestion, questionId.ToString(), true,
             new { ScreeningTestId = testId });
         TempData["StatusMessage"] = "The question was deactivated. Its record is preserved.";
-        return RedirectToAction(nameof(Index), new { testId });
+        return RedirectAfterQuestionEdit(testId, returnToBuilder, returnPage);
     }
 
     [HttpPost("{questionId:int}/move")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Move(int testId, int questionId, string direction)
+    public async Task<IActionResult> Move(int testId, int questionId, string direction, bool returnToBuilder = false, int returnPage = 1)
     {
         if (direction is not "up" and not "down")
         {
@@ -236,7 +435,7 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             TempData["StatusMessage"] = "The question order was updated.";
         }
 
-        return RedirectToAction(nameof(Index), new { testId });
+        return RedirectAfterQuestionEdit(testId, returnToBuilder, returnPage);
     }
 
     private Task<ScreeningTest?> FindScreeningTestAsync(int testId) =>
@@ -375,6 +574,136 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
         {
             ModelState.AddModelError(nameof(model.AudioPath), "Use a supported audio file name such as story.mp3. Folder paths and URLs are not allowed.");
         }
+        else if (model.QuestionType == ScreeningQuestionType.ListeningResponse && model.ListeningComposerEnabled &&
+                 !ScreeningAudioSource.TryResolve(model.AudioPath, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out _, out _))
+        {
+            ModelState.AddModelError(nameof(model.AudioPath), "Record or upload an audio stimulus before saving this listening question.");
+        }
+
+        if (model.QuestionType == ScreeningQuestionType.ListeningResponse)
+        {
+            var responseType = NormalizeResponseType(model.ListeningResponseType);
+            if (model.ListeningComposerEnabled && responseType == "multiple-choice")
+            {
+                if (choiceOptions.Distinct(StringComparer.OrdinalIgnoreCase).Count() < 2)
+                {
+                    ModelState.AddModelError(nameof(model.ChoiceOptionsText), "Enter at least two different answer choices for a listening multiple-choice question.");
+                }
+                if (string.IsNullOrWhiteSpace(model.CorrectAnswer) || !choiceOptions.Contains(model.CorrectAnswer.Trim(), StringComparer.OrdinalIgnoreCase))
+                {
+                    ModelState.AddModelError(nameof(model.CorrectAnswer), "Choose a correct answer from the listening answer choices.");
+                }
+            }
+            else if (model.ListeningComposerEnabled && responseType == "text-response" && string.IsNullOrWhiteSpace(model.CorrectAnswer))
+            {
+                ModelState.AddModelError(nameof(model.CorrectAnswer), "Enter the expected spoken response.");
+            }
+            else if (model.ListeningComposerEnabled && responseType == "audio-response" && !model.AllowsAudioRecording)
+            {
+                ModelState.AddModelError(nameof(model.AllowsAudioRecording), "Enable learner audio recording when the response type is Audio response.");
+            }
+        }
+    }
+
+    private static void NormalizeChoiceOptions(AdminScreeningQuestionFormViewModel model)
+    {
+        if (model.AnswerOptions.Any(option => !string.IsNullOrWhiteSpace(option)))
+        {
+            model.ChoiceOptionsText = string.Join(Environment.NewLine,
+                model.AnswerOptions.Where(option => !string.IsNullOrWhiteSpace(option)).Select(option => option.Trim()));
+        }
+
+        model.AnswerOptions = ParseLines(model.ChoiceOptionsText);
+        var usesAnswerChoice = (model.QuestionType is ScreeningQuestionType.MultipleChoice or
+            ScreeningQuestionType.PhonologicalChoice or
+            ScreeningQuestionType.PatternReasoning) ||
+            model.QuestionType == ScreeningQuestionType.ListeningResponse &&
+            NormalizeResponseType(model.ListeningResponseType) == "multiple-choice";
+        if (usesAnswerChoice && !string.IsNullOrWhiteSpace(model.SelectedCorrectAnswer) &&
+            model.AnswerOptions.Contains(model.SelectedCorrectAnswer.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            model.CorrectAnswer = model.SelectedCorrectAnswer.Trim();
+        }
+
+        if (model.AnswerOptions.Count == 0)
+        {
+            model.AnswerOptions = [string.Empty, string.Empty];
+        }
+        else if (model.AnswerOptions.Count == 1)
+        {
+            model.AnswerOptions.Add(string.Empty);
+        }
+    }
+
+    private static bool SupportsLearnerRecording(ScreeningQuestionType questionType) => questionType is
+        ScreeningQuestionType.WordReading or
+        ScreeningQuestionType.NonWordReading or
+        ScreeningQuestionType.TimedNaming or
+        ScreeningQuestionType.ListeningResponse or
+        ScreeningQuestionType.ReadingFluency;
+
+    private static bool HasQuestionTypeData(ScreeningQuestion question) =>
+        !string.IsNullOrWhiteSpace(question.CorrectAnswer) ||
+        !string.IsNullOrWhiteSpace(question.AcceptedAnswersJson) ||
+        !string.IsNullOrWhiteSpace(question.MetadataJson) ||
+        !string.IsNullOrWhiteSpace(question.AudioPath) ||
+        !string.IsNullOrWhiteSpace(question.ImagePath) ||
+        question.AllowsAudioRecording;
+
+    private IActionResult BuildCandidatePreview(ScreeningTest screeningTest, AdminScreeningQuestionFormViewModel model, string? returnUrl)
+    {
+        var audioPreviewUrl = model.QuestionType == ScreeningQuestionType.ListeningResponse &&
+                              !string.IsNullOrWhiteSpace(model.AudioPath)
+            ? Url.Action(nameof(AudioPreview), new { testId = screeningTest.Id, fileName = model.AudioPath })
+            : null;
+        var choices = model.QuestionType == ScreeningQuestionType.MultipleChoice ||
+                      model.QuestionType == ScreeningQuestionType.ListeningResponse && NormalizeResponseType(model.ListeningResponseType) == "multiple-choice"
+            ? ParseLines(model.ChoiceOptionsText)
+            : model.QuestionType is ScreeningQuestionType.PhonologicalChoice or
+                ScreeningQuestionType.TimedMatching or ScreeningQuestionType.PatternReasoning
+                ? ParseLines(model.ChoiceOptionsText)
+                : [];
+        var previewQuestion = new AssessmentPreviewQuestion(
+            string.IsNullOrWhiteSpace(model.Prompt) ? "Your question prompt will appear here." : model.Prompt.Trim(),
+            GetQuestionTypeDisplayName(model.QuestionType),
+            choices,
+            model.QuestionType is ScreeningQuestionType.ReadingPassage or ScreeningQuestionType.ReadingFluency
+                ? NormalizeOptionalText(model.PassageText)
+                : null,
+            model.AllowsAudioRecording && SupportsLearnerRecording(model.QuestionType),
+            GetSafePreviewImagePath(model.ImagePath),
+            audioPreviewUrl,
+            model.MaxAudioReplays,
+            NormalizeOptionalText(model.Transcript));
+
+        return View("~/Views/AdminAssessmentBuilder/Preview.cshtml", new AssessmentPreviewViewModel
+        {
+            ScreeningTestId = screeningTest.Id,
+            Name = screeningTest.Name,
+            Description = screeningTest.Description,
+            Instructions = screeningTest.Instructions,
+            ReturnUrl = returnUrl,
+            ReturnLabel = "Back to question editor",
+            Questions = [previewQuestion]
+        });
+    }
+
+    private static string? GetSafePreviewImagePath(string? value)
+    {
+        var path = NormalizeOptionalText(value);
+        if (path is null)
+        {
+            return null;
+        }
+
+        if (Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
+            (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return path;
+        }
+
+        return path.StartsWith('/') && !path.StartsWith("//") && !path.Contains('\\') ? path : null;
     }
 
     private static string? GetCorrectAnswer(AdminScreeningQuestionFormViewModel model)
@@ -397,6 +726,9 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             ScreeningQuestionType.NonWordReading or
             ScreeningQuestionType.Spelling or
             ScreeningQuestionType.WorkingMemorySequence => answer,
+            ScreeningQuestionType.ListeningResponse when NormalizeResponseType(model.ListeningResponseType) != "multiple-choice" => answer,
+            ScreeningQuestionType.ListeningResponse => ParseLines(model.ChoiceOptionsText)
+                .FirstOrDefault(option => string.Equals(option, answer, StringComparison.OrdinalIgnoreCase)),
             _ => null
         };
     }
@@ -439,10 +771,12 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
     {
         var metadata = new ScreeningQuestionMetadata
         {
-            ChoiceOptions = model.QuestionType is ScreeningQuestionType.MultipleChoice or
+            ChoiceOptions = (model.QuestionType is ScreeningQuestionType.MultipleChoice or
                 ScreeningQuestionType.PhonologicalChoice or
                 ScreeningQuestionType.TimedMatching or
-                ScreeningQuestionType.PatternReasoning
+                ScreeningQuestionType.PatternReasoning) ||
+                model.QuestionType == ScreeningQuestionType.ListeningResponse &&
+                model.ListeningComposerEnabled && NormalizeResponseType(model.ListeningResponseType) == "multiple-choice"
                 ? ParseLines(model.ChoiceOptionsText).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
                 : null,
             PassageText = model.QuestionType is ScreeningQuestionType.ReadingPassage or ScreeningQuestionType.ReadingFluency
@@ -456,6 +790,18 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
                 : null,
             MaxAudioReplays = model.QuestionType == ScreeningQuestionType.ListeningResponse
                 ? model.MaxAudioReplays
+                : null,
+            AudioSource = model.QuestionType == ScreeningQuestionType.ListeningResponse && model.ListeningComposerEnabled
+                ? NormalizeOptionalText(model.AudioSourceMode)
+                : null,
+            AudioDurationSeconds = model.QuestionType == ScreeningQuestionType.ListeningResponse && model.ListeningComposerEnabled
+                ? model.AudioDurationSeconds
+                : null,
+            Transcript = model.QuestionType == ScreeningQuestionType.ListeningResponse && model.ListeningComposerEnabled
+                ? NormalizeOptionalText(model.Transcript)
+                : null,
+            ResponseType = model.QuestionType == ScreeningQuestionType.ListeningResponse && model.ListeningComposerEnabled
+                ? NormalizeResponseType(model.ListeningResponseType)
                 : null,
             TimeLimitSeconds = model.QuestionType is ScreeningQuestionType.TimedNaming or ScreeningQuestionType.TimedMatching
                 ? model.TimeLimitSeconds
@@ -483,6 +829,7 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
 
         return metadata.ChoiceOptions is null && metadata.PassageText is null && metadata.ReferenceWordCount is null &&
                metadata.TargetWordsPerMinute is null && metadata.MaxAudioReplays is null &&
+               metadata.AudioSource is null && metadata.AudioDurationSeconds is null && metadata.Transcript is null && metadata.ResponseType is null &&
                metadata.TimeLimitSeconds is null && metadata.TimedMatchingReferenceMapping is null &&
                metadata.TimedMatchingItems is null && metadata.TimedNamingItems is null &&
                metadata.WorkingMemorySequence is null && metadata.MemoryDisplayDurationMilliseconds is null &&
@@ -501,13 +848,22 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             Id = question.Id,
             Prompt = question.Prompt,
             QuestionType = question.QuestionType,
+            Weight = question.Weight,
             CorrectAnswer = question.CorrectAnswer,
             AcceptedAnswersText = acceptedAnswers is null ? null : string.Join(Environment.NewLine, acceptedAnswers),
             ChoiceOptionsText = metadata.ChoiceOptions is null ? null : string.Join(Environment.NewLine, metadata.ChoiceOptions),
+            AnswerOptions = metadata.ChoiceOptions is null || metadata.ChoiceOptions.Count == 0
+                ? [string.Empty, string.Empty]
+                : metadata.ChoiceOptions.ToList(),
             PassageText = metadata.PassageText,
             ReferenceWordCount = metadata.ReferenceWordCount,
             TargetWordsPerMinute = metadata.TargetWordsPerMinute,
             MaxAudioReplays = metadata.MaxAudioReplays,
+            AudioSourceMode = metadata.AudioSource ?? (question.AudioPath is null ? "upload" : "existing"),
+            AudioDurationSeconds = metadata.AudioDurationSeconds,
+            Transcript = metadata.Transcript,
+            ListeningResponseType = metadata.ResponseType ?? "multiple-choice",
+            ListeningComposerEnabled = question.QuestionType == ScreeningQuestionType.ListeningResponse,
             TimeLimitSeconds = metadata.TimeLimitSeconds,
             TimedMatchingReferenceMappingText = metadata.TimedMatchingReferenceMapping is null
                 ? null
@@ -542,6 +898,16 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             return new ScreeningQuestionMetadata();
         }
     }
+
+    private static string? SerializeMetadata(ScreeningQuestionMetadata metadata) =>
+        metadata.ChoiceOptions is null && metadata.PassageText is null && metadata.ReferenceWordCount is null &&
+        metadata.TargetWordsPerMinute is null && metadata.MaxAudioReplays is null && metadata.AudioSource is null &&
+        metadata.AudioDurationSeconds is null && metadata.Transcript is null && metadata.ResponseType is null &&
+        metadata.TimeLimitSeconds is null && metadata.TimedMatchingReferenceMapping is null && metadata.TimedMatchingItems is null &&
+        metadata.TimedNamingItems is null && metadata.WorkingMemorySequence is null && metadata.MemoryDisplayDurationMilliseconds is null &&
+        metadata.PatternDifficultyLevel is null
+            ? null
+            : JsonSerializer.Serialize(metadata, MetadataJsonOptions);
 
     private static List<string>? DeserializeAcceptedAnswers(string? acceptedAnswersJson)
     {
@@ -599,6 +965,13 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
     private static string? NormalizeOptionalText(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static string NormalizeResponseType(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "text-response" => "text-response",
+        "audio-response" => "audio-response",
+        _ => "multiple-choice"
+    };
+
     private static string GetQuestionTypeDisplayName(ScreeningQuestionType questionType) =>
         typeof(ScreeningQuestionType)
             .GetMember(questionType.ToString())
@@ -606,9 +979,17 @@ public sealed class AdminScreeningQuestionsController(ApplicationDbContext dbCon
             .GetCustomAttribute<DisplayAttribute>()?
             .GetName() ?? questionType.ToString();
 
-    private void SetTestContext(ScreeningTest screeningTest)
+    private IActionResult RedirectAfterQuestionEdit(int testId, bool returnToBuilder, int returnPage) =>
+        returnToBuilder
+            ? RedirectToAction("Index", "AdminAssessmentBuilder", new { testId, page = Math.Max(returnPage, 1) })
+            : RedirectToAction(nameof(Index), new { testId });
+
+    private void SetTestContext(ScreeningTest screeningTest, bool returnToBuilder = false, int returnPage = 1)
     {
         ViewData["ScreeningTestId"] = screeningTest.Id;
         ViewData["ScreeningTestName"] = screeningTest.Name;
+        ViewData["ReturnToBuilder"] = returnToBuilder;
+        ViewData["ReturnPage"] = Math.Max(returnPage, 1);
+        ViewData["OpenAiConfigured"] = draftGenerator.IsConfigured;
     }
 }

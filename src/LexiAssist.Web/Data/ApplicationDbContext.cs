@@ -26,6 +26,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<ScreeningQuestion> ScreeningQuestions => Set<ScreeningQuestion>();
 
+    public DbSet<AssessmentDraft> AssessmentDrafts => Set<AssessmentDraft>();
+
     public DbSet<ScreeningAttempt> ScreeningAttempts => Set<ScreeningAttempt>();
 
     public DbSet<ScreeningTestAttempt> ScreeningTestAttempts => Set<ScreeningTestAttempt>();
@@ -245,6 +247,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                     IsActive = false,
                     SortOrder = 9
                 });
+        });
+
+        builder.Entity<AssessmentDraft>(entity =>
+        {
+            entity.Property(draft => draft.ContentJson).IsRequired();
+            entity.Property(draft => draft.Version).IsConcurrencyToken();
+            entity.HasIndex(draft => new { draft.ScreeningTestId, draft.IsDiscarded });
+            entity.HasOne(draft => draft.ScreeningTest)
+                .WithMany()
+                .HasForeignKey(draft => draft.ScreeningTestId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<ScreeningQuestion>(entity =>

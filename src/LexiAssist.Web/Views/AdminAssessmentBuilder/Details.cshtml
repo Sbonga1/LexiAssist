@@ -1,0 +1,81 @@
+@model LexiAssist.Web.ViewModels.AdminScreeningTests.AdminScreeningTestFormViewModel
+@{
+    ViewData["Title"] = "Assessment details";
+}
+
+<section class="assessment-stage assessment-details" data-assessment-builder-root aria-labelledby="assessment-details-heading">
+    <header class="assessment-builder-workflow">
+        <a asp-controller="AdminAssessmentBuilder" asp-action="Index" asp-route-testId="@Model.Id" class="assessment-builder-back">← <span>Back to Build</span></a>
+        <nav class="assessment-builder-steps" aria-label="Assessment authoring steps">
+            <span class="is-current" aria-current="step">Details</span>
+            <a asp-controller="AdminAssessmentBuilder" asp-action="Index" asp-route-testId="@Model.Id">Build</a>
+            <a asp-controller="AdminAssessmentBuilder" asp-action="Configure" asp-route-testId="@Model.Id">Configure</a>
+            <a asp-controller="AdminAssessmentBuilder" asp-action="Review" asp-route-testId="@Model.Id">Review</a>
+        </nav>
+        <a asp-controller="AdminAssessmentBuilder" asp-action="Preview" asp-route-testId="@Model.Id" class="assessment-builder-button assessment-builder-button-secondary">Candidate preview</a>
+    </header>
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+    <div class="alert alert-info" data-builder-feedback role="status" aria-live="polite" hidden></div>
+
+    <header class="assessment-stage-heading">
+        <p class="auth-eyebrow">Administration · Assessment setup</p>
+        <h1 id="assessment-details-heading">Assessment details</h1>
+        <p>Update the assessment name, purpose, and instructions. Use the steps above to return to Build, Configure, or Review.</p>
+    </header>
+
+    <div class="assessment-stage-card">
+        <div class="assessment-stage-card-heading">
+            <span class="assessment-stage-icon" aria-hidden="true">✎</span>
+            <div>
+                <h2>Assessment information</h2>
+                <p>These details appear in the assessment and help administrators manage its content.</p>
+            </div>
+        </div>
+
+        <form asp-controller="AdminScreeningTests" asp-action="Edit" asp-route-id="@Model.Id" method="post" class="auth-form">
+            @Html.AntiForgeryToken()
+            <input asp-for="Id" type="hidden" />
+            <input type="hidden" name="returnToBuilder" value="true" />
+            <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" autofocus />
+                <span asp-validation-for="Name" aria-live="polite" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Slug" class="form-label"></label>
+                <input asp-for="Slug" class="form-control" aria-describedby="slug-help" />
+                <div id="slug-help" class="form-text">Use letters, numbers, and hyphens. The slug is saved in lowercase.</div>
+                <span asp-validation-for="Slug" aria-live="polite" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+                <span asp-validation-for="Description" aria-live="polite" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Instructions" class="form-label"></label>
+                <textarea asp-for="Instructions" class="form-control" rows="5"></textarea>
+                <span asp-validation-for="Instructions" aria-live="polite" class="text-danger small"></span>
+            </div>
+
+            <div class="assessment-stage-actions justify-content-start gap-2">
+                <button type="submit" class="assessment-builder-button assessment-builder-button-primary">Save changes</button>
+                <a asp-controller="AdminAssessmentBuilder" asp-action="Index" asp-route-testId="@Model.Id" class="assessment-builder-button assessment-builder-button-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/assessment-builder-actions.js" asp-append-version="true"></script>
+}

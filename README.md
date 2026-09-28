@@ -73,7 +73,9 @@ The application applies development migrations during startup. In Development, l
 
 ## Development administrator
 
-Administrator seeding is disabled by default. When it is needed for local development, keep the credentials in user-secrets rather than in checked-in files:
+Administrator seeding is disabled by default. Configure it from Visual Studio's Package Manager Console, keeping credentials out of checked-in files.
+
+For credentials that Visual Studio can reuse when you start the project with F5, save them in user-secrets:
 
 ~~~powershell
 dotnet user-secrets set "DevelopmentAdminSeed:Enabled" "true" --project src/LexiAssist.Web
@@ -81,7 +83,16 @@ dotnet user-secrets set "DevelopmentAdminSeed:Email" "admin@example.test" --proj
 dotnet user-secrets set "DevelopmentAdminSeed:Password" "<unique-local-development-password>" --project src/LexiAssist.Web
 ~~~
 
-The seed runs only in Development. Use a unique local password that satisfies the configured Identity rules. There is no shared or production administrator password in source control.
+To use environment variables for one Package Manager Console session instead, set the double-underscore configuration keys and start the app from that same console:
+
+~~~powershell
+$env:DevelopmentAdminSeed__Enabled = "true"
+$env:DevelopmentAdminSeed__Email = "admin@example.test"
+$env:DevelopmentAdminSeed__Password = "<unique-local-development-password>"
+dotnet run --project src/LexiAssist.Web --launch-profile http
+~~~
+
+The environment variable form `DevelopmentAdminSeed__Email` maps to the `DevelopmentAdminSeed:Email` setting. The seed runs only when the app starts in Development; running `Update-Database` by itself does not create the account. Use a unique local password that satisfies the configured Identity rules. There is no shared or production administrator password in source control.
 
 ## Roles
 
@@ -193,6 +204,14 @@ Non-secret development defaults and transparent scoring/activity configuration a
 ConnectionStrings__DefaultConnection=Data Source=lexiassist.db;Cache=Shared
 ~~~
 
+Assessment draft generation uses the OpenAI Responses API with `gpt-6-astra`. Set `OPENAI_API_KEY` in the application environment, or store it in local Development user-secrets from Package Manager Console:
+
+~~~powershell
+dotnet user-secrets set "OPENAI_API_KEY" "<your OpenAI API key>" --project src/LexiAssist.Web
+~~~
+
+The key is never stored in application source. The builder sends assessment title, description, instructions, and existing question prompts to OpenAI only after an administrator submits the generation form. Generated questions remain inactive until an administrator reviews and activates them.
+
 Keep passwords, connection credentials, external service credentials, and production Data Protection keys outside source control. User-secrets are suitable for local Development; use the deployment platform's secret store in production. Do not put passwords, password hashes, tokens, or raw sensitive request bodies in logs.
 
 ## Testing
@@ -223,6 +242,5 @@ The tests use isolated test databases and application factories rather than the 
 - Game content is configuration-based and does not yet have an administrator editing interface.
 - Audio is optional and browser-dependent. There is no speech recognition, transcription, or clinical pronunciation scoring.
 - There are no external authentication providers, JWT APIs, email/SMS notifications, background reminder jobs, attendance integration, or PDF report export.
-- Practice stories are deterministic templates; external AI content generation is only represented by a provider-ready interface and is not connected.
+- Practice stories are deterministic templates. Assessment question draft generation connects to GPT-6 Astra when an OpenAI API key is configured; the live API has not been verified without a key.
 - Risk tiers and progress summaries are educational support information and must be interpreted by appropriately qualified professionals.
-

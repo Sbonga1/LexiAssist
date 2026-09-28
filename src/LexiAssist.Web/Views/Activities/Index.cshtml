@@ -3,7 +3,7 @@
     ViewData["Title"] = "Practice activities";
 }
 
-<section class="dashboard-page" aria-labelledby="activities-heading">
+<section class="dashboard-page learner-activity-hub" aria-labelledby="activities-heading">
     <header class="dashboard-heading">
         <p class="auth-eyebrow">Learner workspace</p>
         <h1 id="activities-heading">Practice activities</h1>
@@ -19,11 +19,11 @@
         <div class="learner-dashboard-grid">
         @foreach (var assignment in Model.Assignments)
         {
-            <section class="learner-dashboard-section" aria-label="@assignment.ActivityName">
-                <p class="auth-eyebrow">@assignment.Status</p>
+            <section class="learner-dashboard-section learner-activity-card" aria-label="@assignment.ActivityName">
+                <p class="auth-eyebrow learner-activity-status">@assignment.Status</p>
                 <h2>@assignment.ActivityName</h2>
                 <p>@assignment.Description</p>
-                <p class="text-secondary">Assigned @assignment.AssignedAtUtc.ToString("D").</p>
+                <p class="text-secondary learner-activity-date">Assigned @assignment.AssignedAtUtc.ToString("D").</p>
                 @if (assignment.Accuracy is { } accuracy)
                 {
                     @if (string.Equals(assignment.ActivityName, "Fast Name Race", StringComparison.OrdinalIgnoreCase))

@@ -124,7 +124,7 @@ public sealed class AccessibilityPreferencesTests
     }
 
     [Fact]
-    public async Task Administrator_accessibility_settings_stays_inside_the_admin_shell()
+    public async Task Administrator_accessibility_settings_uses_the_user_facing_shell()
     {
         using var factory = new LexiAssistWebApplicationFactory();
         using var client = CreateClient(factory);
@@ -135,12 +135,12 @@ public sealed class AccessibilityPreferencesTests
 
         Assert.Equal(HttpStatusCode.OK, settingsPage.StatusCode);
         var html = await settingsPage.Content.ReadAsStringAsync();
-        Assert.Contains("<body class=\"admin-shell\">", html);
-        Assert.Contains("aria-label=\"Administrator navigation\"", html);
-        Assert.Contains("class=\"admin-topbar-title\"", html);
+        Assert.Contains("<body class=\"\">", html);
+        Assert.Contains("class=\"site-header\"", html);
         Assert.Contains("Reading and accessibility", html);
-        Assert.Contains("class=\"admin-nav-link is-active\" href=\"/Settings/Accessibility\"", html);
-        Assert.DoesNotContain("class=\"site-header\"", html);
+        Assert.Contains("href=\"/Settings/Accessibility\">Accessibility settings</a>", html);
+        Assert.DoesNotContain("aria-label=\"Administrator navigation\"", html);
+        Assert.DoesNotContain("class=\"admin-topbar-title\"", html);
     }
 
     private static HttpClient CreateClient(LexiAssistWebApplicationFactory factory) =>

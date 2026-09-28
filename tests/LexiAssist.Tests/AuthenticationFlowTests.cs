@@ -148,6 +148,8 @@ internal sealed class LexiAssistWebApplicationFactory : WebApplicationFactory<Pr
         $"Data Source=LexiAssistTests_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
     private readonly SqliteConnection _anchorConnection;
 
+    public Action<IServiceCollection>? ConfigureAdditionalServices { get; set; }
+
     public LexiAssistWebApplicationFactory()
     {
         _anchorConnection = new SqliteConnection(_connectionString);
@@ -170,6 +172,7 @@ internal sealed class LexiAssistWebApplicationFactory : WebApplicationFactory<Pr
             services.RemoveAll<ApplicationDbContext>();
             services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connectionString));
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
+            ConfigureAdditionalServices?.Invoke(services);
         });
     }
 

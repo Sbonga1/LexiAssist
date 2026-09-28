@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);**/bin/**;**/obj/**</DefaultItemExcludesInProjectFolder>
     <UserSecretsId>aspnet-LexiAssist.Web-2dbe3c62-5517-47a9-bde5-8c94be60ca27</UserSecretsId>
   </PropertyGroup>
 

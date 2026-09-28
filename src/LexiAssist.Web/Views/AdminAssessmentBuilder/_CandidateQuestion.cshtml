@@ -1,0 +1,40 @@
+@model LexiAssist.Web.ViewModels.AssessmentBuilder.AssessmentPreviewQuestion
+
+<p class="assessment-candidate-question-type">@Model.QuestionTypeName</p>
+<h2>@Model.Prompt</h2>
+@if (!string.IsNullOrWhiteSpace(Model.PassageText))
+{
+    <p class="assessment-candidate-passage">@Model.PassageText</p>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+{
+    <img class="assessment-candidate-question-image" src="@Model.ImagePath" alt="Question image" loading="lazy" />
+}
+@if (!string.IsNullOrWhiteSpace(Model.AudioPath))
+{
+    <div class="assessment-candidate-audio-note" role="group" aria-label="Listening stimulus">
+        <strong>Listen to the audio stimulus</strong>
+        <audio controls preload="metadata" src="@Model.AudioPath"></audio>
+        @if (Model.MaxAudioReplays is int replayLimit)
+        {
+            <p>Replay limit: @replayLimit additional repl@(replayLimit == 1 ? "ay" : "ays").</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Transcript))
+        {
+            <details><summary>Show transcript</summary><p>@Model.Transcript</p></details>
+        }
+    </div>
+}
+@if (Model.Choices.Count > 0)
+{
+    <ul class="assessment-candidate-choice-list">
+        @foreach (var choice in Model.Choices)
+        {
+            <li>@choice</li>
+        }
+    </ul>
+}
+@if (Model.AllowsAudioRecording)
+{
+    <p class="assessment-candidate-preview-note">Learner audio recording is available when this question is taken. Recording is disabled in preview.</p>
+}

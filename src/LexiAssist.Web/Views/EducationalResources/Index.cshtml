@@ -3,7 +3,7 @@
     ViewData["Title"] = "Educational resources";
 }
 
-<div class="mb-4">
+<div class="mb-4 learner-page-heading learner-resource-heading">
     <p class="auth-eyebrow">LexiAssist resources</p>
     <h1 class="h2">Educational resources</h1>
     <p class="text-secondary mb-0">Practical reading and learning support you can explore at your own pace.</p>
@@ -22,7 +22,7 @@ else
     @foreach (var resource in Model.Resources)
     {
         <div class="col-12 col-md-6 col-xl-4">
-            <article class="resource-preview h-100">
+            <article class="resource-preview learner-resource-card h-100">
                 <p class="small text-secondary text-uppercase mb-2">@resource.ResourceType</p>
                 <h2 class="h5"><a asp-action="Details" asp-route-id="@resource.Id" class="text-decoration-none">@resource.Title</a></h2>
                 <p class="text-secondary mb-3">@resource.Summary</p>

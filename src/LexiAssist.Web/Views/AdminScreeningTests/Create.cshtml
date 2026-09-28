@@ -3,48 +3,71 @@
     ViewData["Title"] = "Create screening test";
 }
 
-<div class="admin-form-card">
-    <p class="auth-eyebrow">Administration · Screening Tests</p>
-    <h1 class="h2">Create screening test</h1>
-    <p class="text-secondary">Add a reusable screening category. Questions can be managed separately later.</p>
+<section class="admin-screening-test-create-page" aria-labelledby="screening-test-create-heading">
+    <header class="admin-screening-test-create-heading">
+        <p class="auth-eyebrow">Administration · Screening Tests</p>
+        <h1 id="screening-test-create-heading">Create screening test</h1>
+        <p>Add a reusable screening category. Questions can be managed separately later.</p>
+    </header>
 
-    <form asp-action="Create" method="post" class="auth-form">
-        @Html.AntiForgeryToken()
-        <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
-
-        <div class="mb-3">
-            <label asp-for="Name" class="form-label"></label>
-            <input asp-for="Name" class="form-control" autofocus />
-            <span asp-validation-for="Name" aria-live="polite" class="text-danger small"></span>
+    <section class="admin-screening-test-create-card" aria-labelledby="screening-test-create-details-heading">
+        <div class="admin-screening-test-create-card-heading">
+            <span class="admin-screening-test-create-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M6.75 3.75h7.5l4.5 4.5v12h-12z"></path>
+                    <path d="M14.25 3.75v4.5h4.5M9 12h7.5M9 15.5h7.5M9 8.75h1.5"></path>
+                </svg>
+            </span>
+            <div>
+                <h2 id="screening-test-create-details-heading">Test details</h2>
+                <p>Provide a name, slug, description and instructions for this screening test.</p>
+            </div>
         </div>
 
-        <div class="mb-3">
-            <label asp-for="Slug" class="form-label"></label>
-            <input asp-for="Slug" class="form-control" aria-describedby="slug-help" />
-            <div id="slug-help" class="form-text">Use letters, numbers, and hyphens. The slug is saved in lowercase.</div>
-            <span asp-validation-for="Slug" aria-live="polite" class="text-danger small"></span>
-        </div>
+        <form asp-action="Create" method="post" class="admin-screening-test-create-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
 
-        <div class="mb-3">
-            <label asp-for="Description" class="form-label"></label>
-            <textarea asp-for="Description" class="form-control" rows="4"></textarea>
-            <span asp-validation-for="Description" aria-live="polite" class="text-danger small"></span>
-        </div>
+            <div class="admin-screening-test-create-field">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" placeholder="Enter test name" autofocus />
+                <span asp-validation-for="Name" aria-live="polite" class="text-danger small"></span>
+            </div>
 
-        <div class="mb-3">
-            <label asp-for="Instructions" class="form-label"></label>
-            <textarea asp-for="Instructions" class="form-control" rows="5"></textarea>
-            <span asp-validation-for="Instructions" aria-live="polite" class="text-danger small"></span>
-        </div>
+            <div class="admin-screening-test-create-field">
+                <label asp-for="Slug" class="form-label"></label>
+                <input asp-for="Slug" class="form-control" placeholder="Enter slug (e.g. word-reading)" aria-describedby="screening-test-create-slug-help" />
+                <div id="screening-test-create-slug-help" class="form-text">Use letters, numbers, and hyphens. The slug is saved in lowercase.</div>
+                <span asp-validation-for="Slug" aria-live="polite" class="text-danger small"></span>
+            </div>
 
-        <div class="d-flex flex-wrap gap-2 mt-2">
-            <button type="submit" class="btn btn-primary">Create screening test</button>
-            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
-        </div>
-    </form>
-</div>
+            <div class="admin-screening-test-create-field">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control" rows="3" placeholder="Enter a description of this screening test..."></textarea>
+                <span asp-validation-for="Description" aria-live="polite" class="text-danger small"></span>
+            </div>
+
+            <div class="admin-screening-test-create-field">
+                <label asp-for="Instructions" class="form-label"></label>
+                <textarea asp-for="Instructions" class="form-control" rows="3" placeholder="Enter instructions for using this screening test..."></textarea>
+                <span asp-validation-for="Instructions" aria-live="polite" class="text-danger small"></span>
+            </div>
+
+            <div class="admin-screening-test-create-actions">
+                <button type="submit" class="admin-screening-test-create-submit">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M5.25 3.75h9l4.5 4.5v7.5M14.25 3.75v4.5h4.5M8 11h7M8 14h4"></path>
+                        <circle cx="17.5" cy="18" r="3.25"></circle>
+                        <path d="M17.5 16.5v3M16 18h3"></path>
+                    </svg>
+                    <span>Create screening test</span>
+                </button>
+                <a asp-action="Index" class="admin-screening-test-create-cancel">Cancel</a>
+            </div>
+        </form>
+    </section>
+</section>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }
-

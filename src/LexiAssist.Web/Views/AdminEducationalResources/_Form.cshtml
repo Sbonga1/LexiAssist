@@ -2,40 +2,48 @@
 @{
     var isEdit = Model.Id != 0;
 }
-<form asp-action="@(isEdit ? "Edit" : "Create")" asp-route-id="@(isEdit ? Model.Id : (int?)null)" method="post" class="auth-form">
+<form asp-action="@(isEdit ? "Edit" : "Create")" asp-route-id="@(isEdit ? Model.Id : (int?)null)" method="post" class="auth-form @(isEdit ? string.Empty : "admin-educational-resource-create-form")">
     @Html.AntiForgeryToken()
     <input asp-for="Id" type="hidden" />
-    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+    <div asp-validation-summary="All" class="alert alert-danger admin-educational-resource-create-validation" role="alert"></div>
 
     <div class="mb-3">
-        <label asp-for="Title" class="form-label"></label>
-        <input asp-for="Title" class="form-control" autofocus />
-        <span asp-validation-for="Title" aria-live="polite" class="text-danger small"></span>
+        <label asp-for="Title" class="form-label">Title</label>
+        <input asp-for="Title" class="form-control" placeholder="@(isEdit ? null : "Enter a clear, descriptive title")" autofocus aria-required="true" aria-describedby="Title-error" />
+        <span asp-validation-for="Title" id="Title-error" aria-live="polite" class="text-danger small"></span>
     </div>
     <div class="mb-3">
-        <label asp-for="ResourceType" class="form-label"></label>
-        <input asp-for="ResourceType" class="form-control" placeholder="Guide, article, video..." />
-        <span asp-validation-for="ResourceType" aria-live="polite" class="text-danger small"></span>
+        <label asp-for="ResourceType" class="form-label">Resource type</label>
+        <input asp-for="ResourceType" class="form-control" placeholder="Guide, article, video..." aria-required="true" aria-describedby="ResourceType-error" />
+        <span asp-validation-for="ResourceType" id="ResourceType-error" aria-live="polite" class="text-danger small"></span>
     </div>
     <div class="mb-3">
-        <label asp-for="Summary" class="form-label"></label>
-        <textarea asp-for="Summary" class="form-control" rows="3"></textarea>
-        <span asp-validation-for="Summary" aria-live="polite" class="text-danger small"></span>
+        <label asp-for="Summary" class="form-label">Summary</label>
+        <textarea asp-for="Summary" class="form-control" rows="3" placeholder="@(isEdit ? null : "Enter a short summary of this resource...")" aria-required="true" aria-describedby="Summary-error"></textarea>
+        <span asp-validation-for="Summary" id="Summary-error" aria-live="polite" class="text-danger small"></span>
     </div>
     <div class="mb-3">
-        <label asp-for="Content" class="form-label"></label>
-        <textarea asp-for="Content" class="form-control" rows="10"></textarea>
-        <span asp-validation-for="Content" aria-live="polite" class="text-danger small"></span>
+        <label asp-for="Content" class="form-label">Content</label>
+        <textarea asp-for="Content" class="form-control" rows="@(isEdit ? 10 : 4)" placeholder="@(isEdit ? null : "Enter the main content for this resource...")" aria-required="true" aria-describedby="Content-error"></textarea>
+        <span asp-validation-for="Content" id="Content-error" aria-live="polite" class="text-danger small"></span>
     </div>
     <div class="mb-3">
-        <label asp-for="ExternalUrl" class="form-label"></label>
-        <input asp-for="ExternalUrl" class="form-control" type="url" placeholder="https://example.org/resource" />
-        <div class="form-text">Optional. Only http and https links are accepted.</div>
-        <span asp-validation-for="ExternalUrl" aria-live="polite" class="text-danger small"></span>
+        <label asp-for="ExternalUrl" class="form-label">External URL</label>
+        <input asp-for="ExternalUrl" class="form-control" type="url" placeholder="https://example.org/resource" aria-describedby="resource-url-help ExternalUrl-error" />
+        <div id="resource-url-help" class="form-text">Optional. Only http and https links are accepted.</div>
+        <span asp-validation-for="ExternalUrl" id="ExternalUrl-error" aria-live="polite" class="text-danger small"></span>
     </div>
-    <div class="d-flex flex-wrap gap-2 mt-2">
-        <button type="submit" class="btn btn-primary">@(isEdit ? "Save changes" : "Create draft")</button>
-        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    <div class="d-flex flex-wrap gap-2 mt-2 @(isEdit ? string.Empty : "admin-educational-resource-create-actions")">
+        <button type="submit" class="btn btn-primary @(isEdit ? string.Empty : "admin-educational-resource-create-submit")">
+            @if (!isEdit)
+            {
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M5.5 3.5h9l4 4v6M14.5 3.5v4h4M8.5 11h6"></path>
+                    <path d="M17.5 15v6M14.5 18h6"></path>
+                </svg>
+            }
+            <span>@(isEdit ? "Save changes" : "Create draft")</span>
+        </button>
+        <a asp-action="Index" class="btn btn-outline-secondary @(isEdit ? string.Empty : "admin-educational-resource-create-cancel")">Cancel</a>
     </div>
 </form>
-

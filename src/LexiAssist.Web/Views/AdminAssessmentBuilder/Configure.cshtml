@@ -1,0 +1,101 @@
+@model LexiAssist.Web.Services.Interfaces.AssessmentReadinessResult
+@using LexiAssist.Web.Services.Interfaces
+@{
+    ViewData["Title"] = "Configure assessment";
+}
+
+<section class="assessment-stage assessment-configure" aria-labelledby="configure-heading">
+    <header class="assessment-builder-workflow">
+        <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-back">← <span>Back to Build</span></a>
+        <nav class="assessment-builder-steps" aria-label="Assessment authoring steps">
+            <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId">Build</a>
+            <span class="is-current" aria-current="step">Configure</span>
+            <a asp-action="Review" asp-route-testId="@Model.ScreeningTestId">Review</a>
+        </nav>
+        <a asp-action="Details" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-button assessment-builder-button-secondary">Edit details</a>
+    </header>
+
+    <header class="assessment-stage-heading">
+        <p class="auth-eyebrow">Administration · Assessment setup</p>
+        <h1 id="configure-heading">Configure assessment</h1>
+        <p>Check the assessment structure and learner behavior before the final review.</p>
+    </header>
+
+    <div class="assessment-configure-grid">
+        <aside class="assessment-stage-card assessment-configure-context" aria-labelledby="configure-context-heading">
+            <h2 id="configure-context-heading">Assessment structure</h2>
+            <p class="assessment-configure-name">@Model.Name</p>
+            <p class="assessment-stage-muted">@Model.Description</p>
+            <dl class="assessment-stage-facts">
+                <div><dt>Sections</dt><dd>1</dd></div>
+                <div><dt>Total questions</dt><dd>@Model.TotalQuestionCount</dd></div>
+                <div><dt>Active questions</dt><dd>@Model.ActiveQuestionCount</dd></div>
+                <div><dt>Inactive drafts</dt><dd>@Model.InactiveQuestionCount</dd></div>
+            </dl>
+            <div class="assessment-configure-section">
+                <span>SECTION 1</span>
+                <strong>@Model.Name</strong>
+                <small>The existing Screening Test is one logical section.</small>
+            </div>
+            <a asp-action="Details" asp-route-testId="@Model.ScreeningTestId" class="assessment-stage-text-link">Edit assessment details</a>
+        </aside>
+
+        <main class="assessment-stage-card assessment-configure-main" aria-labelledby="assessment-behavior-heading">
+            <div class="assessment-stage-card-heading">
+                <span class="assessment-stage-icon" aria-hidden="true">⚙</span>
+                <div>
+                    <h2 id="assessment-behavior-heading">Assessment behavior</h2>
+                    <p>Runtime settings that apply to the assessment as a whole.</p>
+                </div>
+            </div>
+            <div class="assessment-configure-behavior">
+                <h3>Question order</h3>
+                <p>Learners see active questions in the order shown in Build. Inactive drafts are excluded.</p>
+                <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-stage-text-link">Manage question order and status</a>
+            </div>
+            <div class="assessment-configure-behavior">
+                <h3>Question-specific settings</h3>
+                <p>Timing, listening audio and replay behavior, recording permission, passages, and response choices are configured on each question and used by the learner runtime.</p>
+                <a asp-controller="AdminScreeningQuestions" asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-stage-text-link">Open question authoring</a>
+            </div>
+            <div class="assessment-configure-details">
+                <h3>Instructions shown to learners</h3>
+                <p>@(string.IsNullOrWhiteSpace(Model.Instructions) ? "No assessment instructions are currently set." : Model.Instructions)</p>
+                <a asp-action="Details" asp-route-testId="@Model.ScreeningTestId" class="assessment-stage-text-link">Edit instructions and details</a>
+            </div>
+            <div class="assessment-configure-note" role="note">
+                <strong>No assessment-level settings need saving.</strong>
+                <span>The current assessment model does not persist whole-assessment timing, attempt limits, or progress-display options. This screen uses the saved assessment and question settings directly.</span>
+            </div>
+            <div class="assessment-stage-actions assessment-configure-next">
+                <a asp-action="Review" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-button assessment-builder-button-primary">Continue to review <span aria-hidden="true">→</span></a>
+            </div>
+        </main>
+
+        <aside class="assessment-stage-card assessment-readiness-card" aria-labelledby="configure-readiness-heading">
+            <div class="assessment-readiness-heading">
+                <div>
+                    <p class="assessment-stage-kicker">READINESS</p>
+                    <h2 id="configure-readiness-heading">@(Model.IsReady ? "Ready to activate" : "Action required")</h2>
+                </div>
+                <span class="assessment-readiness-mark @(Model.IsReady ? "is-ready" : "is-blocked")" aria-hidden="true">@(Model.IsReady ? "✓" : "!")</span>
+            </div>
+            <p class="assessment-stage-muted">Computed from the saved assessment and active question configuration.</p>
+            <ul class="assessment-readiness-list">
+                @foreach (var check in Model.Checks)
+                {
+                    var statusClass = check.Severity == AssessmentReadinessSeverity.Passed ? "is-passed" : check.Severity == AssessmentReadinessSeverity.Warning ? "is-warning" : "is-blocking";
+                    var statusText = check.Severity == AssessmentReadinessSeverity.Passed ? "Passed" : check.Severity == AssessmentReadinessSeverity.Warning ? "Info" : "Fix";
+                    <li class="@statusClass">
+                        <span class="assessment-readiness-status">@statusText</span>
+                        <div><strong>@check.Label</strong>@if (!string.IsNullOrWhiteSpace(check.Detail)) { <p>@check.Detail</p> }</div>
+                        @if (!string.IsNullOrWhiteSpace(check.FixUrl))
+                        {
+                            <a href="@check.FixUrl">@check.FixLabel</a>
+                        }
+                    </li>
+                }
+            </ul>
+        </aside>
+    </div>
+</section>

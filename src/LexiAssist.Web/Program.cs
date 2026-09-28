@@ -125,6 +125,8 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.AddScoped<DatabaseInitializationService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IAssessmentReadinessService, AssessmentReadinessService>();
+builder.Services.AddHttpClient<IAssessmentDraftGenerator, OpenAiAssessmentDraftGenerator>();
 builder.Services.AddScoped<AppNotificationService>();
 builder.Services.AddScoped<IUserAccessibilityPreferenceService, UserAccessibilityPreferenceService>();
 builder.Services.Configure<LearnerInterestOptions>(builder.Configuration.GetSection(LearnerInterestOptions.SectionName));
@@ -158,6 +160,7 @@ builder.Services.AddSingleton<AdaptiveSupportService>();
 builder.Services.AddSingleton<ISupportiveFeedbackService, SupportiveFeedbackService>();
 builder.Services.Configure<LearnerAudioRecordingOptions>(builder.Configuration.GetSection(LearnerAudioRecordingOptions.SectionName));
 builder.Services.AddScoped<ILearnerAudioRecordingService, LearnerAudioRecordingService>();
+builder.Services.AddScoped<ListeningAudioService>();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddSingleton<ScreeningErrorCategoryAnalyticsCalculator>();

@@ -1,0 +1,282 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Reflection
+@using LexiAssist.Web.Models.Screening
+@model LexiAssist.Web.ViewModels.AssessmentBuilder.AssessmentDraftReviewViewModel
+@{
+    ViewData["AssessmentWorkspace"] = true;
+    ViewData["Title"] = Model.IsCsvImport ? "Review imported question drafts" : "Review AI question drafts";
+    var activeIndex = Math.Clamp(Model.ActiveQuestionIndex, 0, Math.Max(0, Model.Questions.Count - 1));
+    string TypeName(ScreeningQuestionType type) => typeof(ScreeningQuestionType).GetMember(type.ToString()).FirstOrDefault()?.GetCustomAttribute<DisplayAttribute>()?.GetName() ?? type.ToString();
+}
+
+<section class="assessment-builder-review assessment-draft-review" data-assessment-builder-root data-draft-review aria-labelledby="assessment-draft-review-heading">
+    <header class="draft-review-header">
+        <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-back" data-guard-unsaved>← <span>Back to assessment</span></a>
+        <div class="assessment-builder-workflow draft-standalone-navigation">
+            <partial name="_BuildSteps" model="Model.ScreeningTestId" />
+            <button type="button" class="assessment-builder-button" data-focus-mode aria-pressed="false">Focus mode</button>
+            <a asp-action="Preview" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-button">Candidate preview</a>
+        </div>
+        <p class="auth-eyebrow">Assessment builder · @Model.ScreeningTestName</p>
+        <h1 id="assessment-draft-review-heading">@(Model.IsCsvImport ? "Review imported questions" : "Review generated questions")</h1>
+        <p>@(Model.IsCsvImport ? "Review the imported drafts, edit any details, and add only the questions you select." : "Review and edit each AI draft before adding selected questions to the assessment.")</p>
+        <p class="draft-review-status-note" role="note"><span aria-hidden="true">i</span><span>These are review drafts. Only selected questions are added, and they remain inactive until an administrator activates them.</span></p>
+    </header>
+
+    @if (TempData["ErrorMessage"] is string pageError)
+    {
+        <div class="alert alert-warning" role="alert">@pageError</div>
+    }
+    @if (TempData["DraftSaved"] is string savedMessage)
+    {
+        <div class="alert alert-success" role="status">@savedMessage</div>
+    }
+    @if (Model.ErrorMessage is not null)
+    {
+        <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+    }
+    @if (Model.SuccessMessage is not null)
+    {
+        <div class="alert alert-success" role="status">@Model.SuccessMessage</div>
+    }
+    <div class="alert alert-info" data-draft-feedback role="status" aria-live="polite" hidden></div>
+
+    @if (Model.Questions.Count == 0)
+    {
+        <div class="assessment-builder-empty">
+            <h2>No question drafts to review</h2>
+            <p>Return to the assessment workspace to generate or import questions.</p>
+            <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-button">Back to assessment</a>
+        </div>
+    }
+    else
+    {
+        <form asp-action="SaveDraft" asp-route-testId="@Model.ScreeningTestId" asp-route-draftId="@Model.DraftId" method="post" class="assessment-builder-review-form" data-draft-form novalidate>
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ScreeningTestId" value="@Model.ScreeningTestId" />
+            <input type="hidden" name="Version" value="@Model.Version" data-draft-version />
+            <input type="hidden" name="ActiveQuestionIndex" value="@activeIndex" data-active-question-index />
+            <input type="hidden" name="DifficultyMix" value="@Model.DifficultyMix" />
+
+            <div class="draft-review-summary" aria-live="polite">
+                <p><strong><span data-total-drafts>@Model.Questions.Count</span> drafts</strong><span aria-hidden="true"> · </span><strong><span data-selected-drafts>@Model.SelectedIndexes.Count</span> selected</strong><span aria-hidden="true"> · </span><span>@Model.AddedIndexes.Count already added</span></p>
+                <label class="draft-type-filter" for="draft-type-filter">Filter question type
+                    <select id="draft-type-filter" data-type-filter>
+                        <option value="all">All question types</option>
+                        @foreach (var type in Model.Questions.Select(question => question.QuestionType).Distinct().OrderBy(TypeName))
+                        {
+                            <option value="@((int)type)">@TypeName(type)</option>
+                        }
+                    </select>
+                </label>
+                <button type="button" class="assessment-builder-button draft-navigator-toggle" data-toggle-draft-navigator aria-controls="draft-question-navigator" aria-expanded="true">Question list</button>
+            </div>
+
+            <div class="draft-review-main">
+                <nav id="draft-question-navigator" class="draft-navigator" aria-label="Draft questions" data-draft-navigator>
+                    <div class="draft-selection-controls">
+                        <label><input type="checkbox" data-select-all /> Select all <span data-selection-scope>drafts</span></label>
+                        <span data-selection-count role="status" aria-live="polite"></span>
+                    </div>
+                    @for (var index = 0; index < Model.Questions.Count; index++)
+                    {
+                        var question = Model.Questions[index];
+                        var selected = Model.SelectedIndexes.Contains(index);
+                        var added = Model.AddedIndexes.Contains(index);
+                        var promptExcerpt = string.IsNullOrWhiteSpace(question.Prompt) ? "Untitled draft" : question.Prompt;
+                        <div class="draft-list-row" data-draft-row data-draft-type="@((int)question.QuestionType)" data-draft-index="@index">
+                            <input type="checkbox" name="SelectedIndexes" value="@index" checked="@selected" disabled="@added" aria-label="@(added ? $"Question {index + 1} already added" : $"Include question {index + 1}")" />
+                            <button type="button" class="assessment-builder-button draft-select-question" data-draft-index="@index" aria-controls="draft-editor-@index" aria-current="@(index == activeIndex ? "true" : "false")">
+                                <span class="draft-question-number">@(index + 1)</span>
+                                <span class="draft-question-excerpt">@promptExcerpt</span>
+                                <span class="assessment-builder-type">@TypeName(question.QuestionType)</span>
+                                @if (added) { <span class="draft-added-label">Added</span> }
+                            </button>
+                        </div>
+                    }
+                </nav>
+
+                <div class="draft-editors" data-draft-editors>
+                    <p class="draft-active-filter-note" data-active-filter-note hidden>The active question is hidden by this filter. <button type="button" class="assessment-builder-button" data-clear-filter>Show all question types</button></p>
+                    @for (var index = 0; index < Model.Questions.Count; index++)
+                    {
+                        var question = Model.Questions[index];
+                        var choiceType = question.QuestionType is ScreeningQuestionType.MultipleChoice or ScreeningQuestionType.PhonologicalChoice or ScreeningQuestionType.PatternReasoning ||
+                                         question.QuestionType == ScreeningQuestionType.ListeningResponse && question.ListeningResponseType == "multiple-choice";
+                        var added = Model.AddedIndexes.Contains(index);
+                        var errors = Model.QuestionErrors.TryGetValue(index, out var indexedErrors) ? indexedErrors : Array.Empty<string>();
+                        <article id="draft-editor-@index" class="assessment-builder-review-card draft-question-editor" data-draft-editor="@index" data-draft-type="@((int)question.QuestionType)" hidden="@(index != activeIndex)">
+                            <header class="draft-editor-heading">
+                                <div><p class="auth-eyebrow">@(added ? "Already added" : $"Question {index + 1} of {Model.Questions.Count}")</p><h2>@TypeName(question.QuestionType)</h2></div>
+                                @if (!Model.IsCsvImport && !added && Model.OpenAiConfigured)
+                                {
+                                    <button type="button" class="assessment-builder-button" data-regenerate-question="@index">Regenerate question</button>
+                                }
+                            </header>
+                            @if (errors.Count > 0)
+                            {
+                                <div class="draft-inline-errors" id="draft-error-@index" role="alert"><strong>Review this question:</strong><ul>@foreach (var error in errors) { <li>@error</li> }</ul></div>
+                            }
+                            else
+                            {
+                                <div class="draft-inline-errors" id="draft-error-@index" role="alert" data-question-errors hidden></div>
+                            }
+                            <button type="button" class="assessment-builder-button draft-back-to-list" data-back-to-drafts>Back to question list</button>
+                            <label for="question-prompt-@index">Prompt</label>
+                            <textarea id="question-prompt-@index" name="Questions[@index].Prompt" rows="3" maxlength="1000" aria-required="true" aria-describedby="draft-error-@index">@question.Prompt</textarea>
+                            <input type="hidden" name="Questions[@index].QuestionType" value="@((int)question.QuestionType)" />
+                            <label for="question-weight-@index">Question weight</label>
+                            <input id="question-weight-@index" name="Questions[@index].Weight" type="number" min="0.1" max="100" step="0.1" value="@question.Weight" />
+
+                            @if (choiceType)
+                            {
+                                <fieldset class="draft-options-fieldset">
+                                    <legend>Answer options · select the correct answer</legend>
+                                    <div class="draft-options" data-draft-options>
+                                        @for (var choiceIndex = 0; choiceIndex < question.Choices.Count; choiceIndex++)
+                                        {
+                                            var choiceId = choiceIndex < question.ChoiceIds.Count ? question.ChoiceIds[choiceIndex] : Guid.NewGuid().ToString("N");
+                                            var correct = string.Equals(question.CorrectChoiceId, choiceId, StringComparison.Ordinal);
+                                            <div class="draft-option-row" data-choice-row>
+                                                <input type="hidden" name="Questions[@index].ChoiceIds[@choiceIndex]" value="@choiceId" data-choice-id />
+                                                <input type="radio" name="Questions[@index].CorrectChoiceId" value="@choiceId" checked="@correct" aria-label="Mark option @(choiceIndex + 1) as correct" data-correct-choice />
+                                                <label class="visually-hidden" for="question-@index-choice-@choiceIndex">Answer option @(choiceIndex + 1)</label>
+                                                <input id="question-@index-choice-@choiceIndex" name="Questions[@index].Choices[@choiceIndex]" value="@question.Choices[choiceIndex]" maxlength="300" aria-describedby="draft-error-@index" data-choice-text />
+                                                <button type="button" class="draft-option-action" data-move-choice="up" aria-label="Move option @(choiceIndex + 1) up" disabled="@(choiceIndex == 0 ? "disabled" : null)">↑</button>
+                                                <button type="button" class="draft-option-action" data-move-choice="down" aria-label="Move option @(choiceIndex + 1) down" disabled="@(choiceIndex == question.Choices.Count - 1 ? "disabled" : null)">↓</button>
+                                                <button type="button" class="draft-option-action" data-remove-choice aria-label="Remove option @(choiceIndex + 1)">Remove</button>
+                                            </div>
+                                        }
+                                    </div>
+                                    <button type="button" class="assessment-builder-button" data-add-choice>Add answer option</button>
+                                </fieldset>
+                            }
+                            else if (question.QuestionType == ScreeningQuestionType.TimedMatching)
+                            {
+                                <label for="question-matching-mapping-@index">Reference pairs, one item = symbol per line</label>
+                                <textarea id="question-matching-mapping-@index" name="Questions[@index].TimedMatchingReferenceMappingText" rows="4">@question.TimedMatchingReferenceMappingText</textarea>
+                                <label for="question-matching-items-@index">Matching items, one per line</label>
+                                <textarea id="question-matching-items-@index" name="Questions[@index].TimedMatchingItemsText" rows="4">@question.TimedMatchingItemsText</textarea>
+                                <label for="question-matching-options-@index">Answer symbols, one per line</label>
+                                <textarea id="question-matching-options-@index" name="Questions[@index].ChoicesText" rows="3">@(question.ChoicesText.Length > 0 ? question.ChoicesText : string.Join(Environment.NewLine, question.Choices))</textarea>
+                                <label for="question-time-limit-@index">Time limit (seconds)</label>
+                                <input id="question-time-limit-@index" name="Questions[@index].TimeLimitSeconds" type="number" min="1" max="600" value="@question.TimeLimitSeconds" />
+                            }
+                            else
+                            {
+                                @if (question.QuestionType != ScreeningQuestionType.ListeningResponse || question.ListeningResponseType != "audio-response")
+                                {
+                                    <label for="question-answer-@index">@(question.QuestionType == ScreeningQuestionType.WorkingMemorySequence ? "Expected sequence answer" : "Correct answer")</label>
+                                    <input id="question-answer-@index" name="Questions[@index].CorrectAnswer" value="@question.CorrectAnswer" maxlength="500" aria-describedby="draft-error-@index" />
+                                }
+                                <label for="question-accepted-answers-@index">Accepted answers, one per line (optional)</label>
+                                <textarea id="question-accepted-answers-@index" name="Questions[@index].AcceptedAnswersText" rows="3" maxlength="8000">@(question.AcceptedAnswersText.Length > 0 ? question.AcceptedAnswersText : string.Join(Environment.NewLine, question.AcceptedAnswers))</textarea>
+                            }
+
+                            @switch (question.QuestionType)
+                            {
+                                case ScreeningQuestionType.ReadingPassage:
+                                case ScreeningQuestionType.ReadingFluency:
+                                    <label for="question-passage-@index">Reading passage</label>
+                                    <textarea id="question-passage-@index" name="Questions[@index].PassageText" rows="5" maxlength="8000">@question.PassageText</textarea>
+                                    <label for="question-reference-count-@index">Reference word count (optional)</label>
+                                    <input id="question-reference-count-@index" name="Questions[@index].ReferenceWordCount" type="number" min="1" max="10000" value="@question.ReferenceWordCount" />
+                                    @if (question.QuestionType == ScreeningQuestionType.ReadingFluency)
+                                    {
+                                        <label for="question-pace-@index">Target words per minute (optional)</label>
+                                        <input id="question-pace-@index" name="Questions[@index].TargetWordsPerMinute" type="number" min="1" max="1000" value="@question.TargetWordsPerMinute" />
+                                    }
+                                    break;
+                                case ScreeningQuestionType.TimedNaming:
+                                    <label for="question-naming-items-@index">Naming items, exactly 20, one per line</label>
+                                    <textarea id="question-naming-items-@index" name="Questions[@index].TimedNamingItemsText" rows="7">@question.TimedNamingItemsText</textarea>
+                                    <label for="question-naming-time-@index">Time limit (seconds)</label>
+                                    <input id="question-naming-time-@index" name="Questions[@index].TimeLimitSeconds" type="number" min="1" max="600" value="@question.TimeLimitSeconds" />
+                                    break;
+                                case ScreeningQuestionType.WorkingMemorySequence:
+                                    <label for="question-sequence-@index">Sequence items, one per line</label>
+                                    <textarea id="question-sequence-@index" name="Questions[@index].WorkingMemorySequenceText" rows="5">@question.WorkingMemorySequenceText</textarea>
+                                    <label for="question-sequence-display-@index">Display duration (milliseconds)</label>
+                                    <input id="question-sequence-display-@index" name="Questions[@index].MemoryDisplayDurationMilliseconds" type="number" min="1000" max="30000" value="@question.MemoryDisplayDurationMilliseconds" />
+                                    break;
+                                case ScreeningQuestionType.PatternReasoning:
+                                    <label for="question-pattern-level-@index">Pattern difficulty (1 to 5)</label>
+                                    <input id="question-pattern-level-@index" name="Questions[@index].PatternDifficultyLevel" type="number" min="1" max="5" value="@question.PatternDifficultyLevel" />
+                                    break;
+                                case ScreeningQuestionType.ListeningResponse:
+                                    <label for="question-listening-audio-@index">Audio file name</label>
+                                    <input id="question-listening-audio-@index" name="Questions[@index].AudioPath" value="@question.AudioPath" maxlength="255" />
+                                    <label for="question-listening-response-@index">Response type</label>
+                                    <select id="question-listening-response-@index" name="Questions[@index].ListeningResponseType">
+                                        <option value="multiple-choice" selected="@(question.ListeningResponseType == "multiple-choice")">Multiple choice</option>
+                                        <option value="text-response" selected="@(question.ListeningResponseType == "text-response")">Text response</option>
+                                        <option value="audio-response" selected="@(question.ListeningResponseType == "audio-response")">Audio response</option>
+                                    </select>
+                                    <label for="question-transcript-@index">Accessibility transcript (optional)</label>
+                                    <textarea id="question-transcript-@index" name="Questions[@index].Transcript" rows="3" maxlength="12000">@question.Transcript</textarea>
+                                    <label for="question-replays-@index">Maximum additional replays (optional)</label>
+                                    <input id="question-replays-@index" name="Questions[@index].MaxAudioReplays" type="number" min="0" max="20" value="@question.MaxAudioReplays" />
+                                    break;
+                            }
+                            @if (question.QuestionType is ScreeningQuestionType.WordReading or ScreeningQuestionType.NonWordReading or ScreeningQuestionType.TimedNaming or ScreeningQuestionType.ListeningResponse or ScreeningQuestionType.ReadingFluency)
+                            {
+                                <label class="draft-inline-check"><input type="checkbox" name="Questions[@index].AllowsAudioRecording" value="true" checked="@question.AllowsAudioRecording" /> Allow learner audio recording</label>
+                                <input type="hidden" name="Questions[@index].AllowsAudioRecording" value="false" />
+                            }
+                            <label for="question-image-@index">Image path or URL (optional)</label>
+                            <input id="question-image-@index" name="Questions[@index].ImagePath" value="@question.ImagePath" maxlength="1024" />
+                            <div class="draft-editor-preview-actions">
+                                <a asp-action="DraftQuestionPreview" asp-route-testId="@Model.ScreeningTestId" asp-route-draftId="@Model.DraftId" asp-route-index="@index" class="assessment-builder-button" data-guard-unsaved>Preview as learner</a>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </div>
+
+            <div class="assessment-builder-review-footer draft-review-actionbar">
+                <div><strong><span data-action-selected-count>@Model.SelectedIndexes.Count</span> questions selected</strong><span data-added-summary>@Model.AddedIndexes.Count added</span><span data-save-status role="status" aria-live="polite">All draft changes are saved.</span></div>
+                <div class="draft-action-buttons">
+                    <button type="button" class="assessment-builder-button assessment-builder-button-danger" data-discard-drafts>Discard drafts</button>
+                    <button type="submit" name="draftAction" value="save" class="assessment-builder-button" data-save-draft>Save changes</button>
+                    <button type="submit" name="draftAction" value="add" formaction="@Url.Action("AddDraftQuestions", new { testId = Model.ScreeningTestId, draftId = Model.DraftId })" class="assessment-builder-button assessment-builder-button-primary" data-add-selected disabled="@(Model.SelectedIndexes.Count == 0 ? "disabled" : null)">Add @Model.SelectedIndexes.Count questions</button>
+                </div>
+            </div>
+        </form>
+    }
+
+    <form id="discard-draft-form" asp-action="DiscardDraft" asp-route-testId="@Model.ScreeningTestId" asp-route-draftId="@Model.DraftId" method="post" hidden>
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="version" value="@Model.Version" data-discard-version />
+    </form>
+    <form id="regenerate-draft-form" asp-action="RegenerateDraftQuestion" asp-route-testId="@Model.ScreeningTestId" asp-route-draftId="@Model.DraftId" method="post" hidden>
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="version" value="@Model.Version" data-regenerate-version />
+        <input type="hidden" name="index" value="@activeIndex" data-regenerate-index />
+    </form>
+
+    <dialog class="draft-confirm-dialog" data-unsaved-dialog aria-labelledby="unsaved-dialog-title" aria-describedby="unsaved-dialog-description">
+        <form method="dialog">
+            <h2 id="unsaved-dialog-title">Unsaved draft changes</h2>
+            <p id="unsaved-dialog-description">Save your edits before continuing, discard the unsaved edits, or cancel and stay on this question.</p>
+            <div class="draft-dialog-actions">
+                <button type="button" class="assessment-builder-button" data-unsaved-action="cancel">Cancel</button>
+                <button type="button" class="assessment-builder-button assessment-builder-button-danger" data-unsaved-action="discard">Discard changes</button>
+                <button type="button" class="assessment-builder-button assessment-builder-button-primary" data-unsaved-action="save">Save changes and continue</button>
+            </div>
+        </form>
+    </dialog>
+    <dialog class="draft-confirm-dialog" data-discard-dialog aria-labelledby="discard-dialog-title" aria-describedby="discard-dialog-description">
+        <form method="dialog">
+            <h2 id="discard-dialog-title">Discard all review drafts?</h2>
+            <p id="discard-dialog-description">This closes and marks these review drafts as discarded. Existing assessment questions will not be changed.</p>
+            <div class="draft-dialog-actions">
+                <button type="button" class="assessment-builder-button" data-discard-action="cancel">Cancel</button>
+                <button type="button" class="assessment-builder-button assessment-builder-button-danger" data-discard-action="confirm">Discard drafts</button>
+            </div>
+        </form>
+    </dialog>
+</section>
+
+@section Scripts {
+    <script src="~/js/assessment-builder-actions.js" asp-append-version="true"></script>
+}

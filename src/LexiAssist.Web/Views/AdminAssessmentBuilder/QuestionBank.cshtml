@@ -1,0 +1,51 @@
+@model LexiAssist.Web.ViewModels.AssessmentBuilder.AssessmentQuestionBankViewModel
+@{
+    ViewData["Title"] = "Question bank";
+}
+
+<section class="assessment-builder-bank" data-assessment-builder-root aria-labelledby="assessment-bank-heading">
+    <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-back">← <span>Back to builder</span></a>
+    <header>
+        <p class="auth-eyebrow">Assessment builder · @Model.ScreeningTestName</p>
+        <h1 id="assessment-bank-heading">Choose from question bank</h1>
+        <p>Copy an active question from another screening test. Its settings are copied, and the original remains unchanged.</p>
+    </header>
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+    <div class="alert alert-info" data-builder-feedback role="status" aria-live="polite" hidden></div>
+    <form asp-action="QuestionBank" asp-route-testId="@Model.ScreeningTestId" method="get" class="assessment-builder-bank-search">
+        <input type="hidden" name="testId" value="@Model.ScreeningTestId" />
+        <label for="search">Search prompts and assessments</label>
+        <input id="search" name="search" value="@Model.Search" maxlength="120" />
+        <button type="submit" class="assessment-builder-button assessment-builder-button-secondary">Search</button>
+    </form>
+    <p class="assessment-builder-bank-count">Showing up to 50 matching active questions.</p>
+    @if (Model.Questions.Count == 0)
+    {
+        <div class="assessment-builder-empty"><h2>No matching questions</h2><p>Try another search or create a new question.</p></div>
+    }
+    else
+    {
+        <div class="assessment-builder-bank-list">
+            @foreach (var question in Model.Questions)
+            {
+                <article class="assessment-builder-bank-item">
+                    <div>
+                        <p>@question.AssessmentName · @question.QuestionTypeName</p>
+                        <h2>@question.Prompt</h2>
+                    </div>
+                    <form asp-action="CopyQuestion" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="assessment-builder-button assessment-builder-button-primary">Copy question</button>
+                    </form>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@section Scripts {
+    <script src="~/js/assessment-builder-actions.js" asp-append-version="true"></script>
+}

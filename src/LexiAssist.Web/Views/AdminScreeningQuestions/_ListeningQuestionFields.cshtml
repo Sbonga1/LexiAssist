@@ -1,0 +1,74 @@
+@model LexiAssist.Web.ViewModels.AdminScreeningTests.AdminScreeningQuestionFormViewModel
+@using LexiAssist.Web.Models.Screening
+@{
+    var testId = (int)(ViewData["ScreeningTestId"] ?? 0);
+    var active = Model.QuestionType == ScreeningQuestionType.ListeningResponse;
+    var previewUrl = !string.IsNullOrWhiteSpace(Model.AudioPath)
+        ? Url.Action("AudioPreview", "AdminScreeningQuestions", new { testId, fileName = Model.AudioPath })
+        : null;
+}
+
+<fieldset class="question-authoring-type-fields listening-composer" data-question-types="9" data-listening-composer data-audio-upload-url="@Url.Action("UploadAudio", "AdminScreeningQuestions", new { testId })" data-audio-remove-url="@(Model.Id > 0 ? Url.Action("RemoveAudio", "AdminScreeningQuestions", new { testId, questionId = Model.Id }) : string.Empty)" hidden="@(!active)" disabled="@(!active)">
+    <legend class="visually-hidden">Listening question composer</legend>
+    <input type="hidden" name="ListeningComposerEnabled" value="true" />
+    <section class="listening-step" aria-labelledby="listening-source-heading">
+        <div class="listening-step-heading"><span>1</span><div><h3 id="listening-source-heading">Audio source <em>Required</em></h3><p>Choose how you want to provide the listening audio. A question cannot be saved until a stimulus is established.</p></div></div>
+        <div class="listening-source-cards" role="radiogroup" aria-label="Audio source">
+            <label class="listening-source-card"><input type="radio" name="AudioSourceMode" value="record" data-audio-source="record" checked="@(Model.AudioSourceMode == "record" ? "checked" : null)" /><span class="listening-source-icon" aria-hidden="true">🎙</span><span><strong>Record audio</strong><small>Record a new clip using a microphone.</small></span></label>
+            <label class="listening-source-card"><input type="radio" name="AudioSourceMode" value="upload" data-audio-source="upload" checked="@(Model.AudioSourceMode is "upload" or null ? "checked" : null)" /><span class="listening-source-icon" aria-hidden="true">☁</span><span><strong>Upload audio</strong><small>Upload an existing WAV, MP3, M4A, OGG, WebM, or AAC file.</small></span></label>
+            @if (Model.Id > 0 && Model.AudioSourceMode == "existing")
+            {
+                <label class="listening-source-card"><input type="radio" name="AudioSourceMode" value="existing" data-audio-source="existing" checked="checked" /><span class="listening-source-icon" aria-hidden="true">▣</span><span><strong>Use existing private audio</strong><small>Reference a protected file already in the application.</small></span></label>
+            }
+        </div>
+
+        <div class="listening-source-panel" data-audio-panel="record" hidden>
+            <div class="listening-record-controls"><label for="microphoneDevice">Microphone</label><select id="microphoneDevice" data-microphone-device><option value="">Default microphone</option></select><span data-permission-state>Microphone permission has not been requested.</span><span class="listening-permission-actions" data-permission-actions hidden><button type="button" class="question-authoring-button question-authoring-button-secondary" data-retry-recording>Try again</button><button type="button" class="question-authoring-button question-authoring-button-secondary" data-upload-instead>Upload audio instead</button></span></div>
+            <div class="listening-record-status" data-record-status role="status">Ready to record. Maximum duration: 2 minutes.</div>
+            <canvas class="listening-waveform" width="640" height="72" data-waveform aria-label="Live recording waveform"></canvas>
+            <div class="listening-record-actions"><button type="button" class="question-authoring-button question-authoring-button-danger" data-record-button>● Record</button><button type="button" class="question-authoring-button question-authoring-button-secondary" data-pause-recording disabled>Pause</button><button type="button" class="question-authoring-button question-authoring-button-secondary" data-stop-recording disabled>Stop</button><button type="button" class="question-authoring-button question-authoring-button-secondary" data-restart-recording>Restart</button></div>
+            <audio controls preload="metadata" data-audio-preview hidden></audio>
+        </div>
+        <div class="listening-source-panel" data-audio-panel="upload" hidden>
+            <label class="listening-dropzone" data-audio-dropzone for="audioFile"><span aria-hidden="true">☁</span><strong>Drop an audio file here or choose one</strong><small>WAV, MP3, M4A, OGG, WebM, or AAC · max 10 MB · max 2 minutes</small><input id="audioFile" name="audioFile" type="file" accept="audio/wav,audio/mpeg,audio/mp4,audio/ogg,audio/webm,audio/aac,.wav,.mp3,.m4a,.ogg,.webm,.aac" data-audio-file /></label>
+            <p class="form-text" data-upload-status>Files are validated and stored in private application storage.</p>
+        </div>
+        <div class="listening-source-panel" data-audio-panel="existing" hidden>
+            <label for="ExistingAudioPath" class="form-label">Existing private audio filename</label><input id="ExistingAudioPath" name="ExistingAudioPath" class="form-control" value="@Model.AudioPath" placeholder="development-listening-blue-bird.wav" data-existing-audio-path /><div class="form-text">Enter only a filename from the protected ScreeningAudio store. URLs and folder paths are rejected.</div>
+        </div>
+
+        <input asp-for="AudioPath" type="hidden" data-audio-path />
+        <input asp-for="AudioDurationSeconds" type="hidden" data-audio-duration />
+        <div class="listening-stimulus" data-audio-stimulus hidden="@(previewUrl is null)">
+            <div><strong data-audio-file-name>@Model.AudioPath</strong><span data-audio-duration-label>@(Model.AudioDurationSeconds is int duration ? $" · {duration}s" : string.Empty)</span></div>
+            <audio controls preload="metadata" src="@previewUrl" data-audio-stored-preview></audio>
+            <button type="button" class="question-authoring-button question-authoring-button-secondary" data-replace-audio>Replace</button>
+            <button type="button" class="question-authoring-button question-authoring-button-danger" data-remove-audio>Remove</button>
+        </div>
+    </section>
+
+    <section class="listening-step" aria-labelledby="listening-content-heading">
+        <div class="listening-step-heading"><span>2</span><div><h3 id="listening-content-heading">Question content</h3><p>Define the learner task after the audio stimulus.</p></div></div>
+        <div class="question-authoring-field" data-listening-prompt><label asp-for="Prompt" class="form-label">Question prompt <span aria-hidden="true">*</span></label><textarea asp-for="Prompt" class="form-control" rows="4" placeholder="Enter the question prompt..."></textarea><span asp-validation-for="Prompt" class="text-danger small"></span></div>
+    </section>
+    <section class="listening-step" aria-labelledby="listening-response-heading">
+        <div class="listening-step-heading"><span>3</span><div><h3 id="listening-response-heading">Answer and response configuration</h3><p>Choose how the learner will respond.</p></div></div>
+        <label asp-for="ListeningResponseType" class="form-label">Response type</label>
+        <select asp-for="ListeningResponseType" class="form-control" data-listening-response-type><option value="multiple-choice">Multiple choice</option><option value="text-response">Text response</option><option value="audio-response">Audio response</option></select>
+        <div class="listening-response-help" data-response-help="multiple-choice">Add answer choices below and mark one correct option.</div>
+        <div class="listening-response-help" data-response-help="text-response" hidden>Enter the expected answer and optional accepted answers below.</div>
+        <div class="listening-response-help" data-response-help="audio-response" hidden>The learner records an answer. No typed answer is required.</div>
+        <div data-listening-expected hidden>
+            <div class="question-authoring-field"><label asp-for="CorrectAnswer" class="form-label">Expected answer</label><input asp-for="CorrectAnswer" class="form-control" placeholder="Enter the expected spoken response" /></div>
+            <div class="question-authoring-field"><label asp-for="AcceptedAnswersText" class="form-label"></label><textarea asp-for="AcceptedAnswersText" class="form-control" rows="3" placeholder="Optional accepted alternatives, one per line"></textarea></div>
+        </div>
+    </section>
+    <section class="listening-step" aria-labelledby="listening-settings-heading">
+        <div class="listening-step-heading"><span>4</span><div><h3 id="listening-settings-heading">Listening settings</h3><p>Control replay behavior and learner recording permission.</p></div></div>
+        <div class="question-authoring-grid-two"><div><label asp-for="MaxAudioReplays" class="form-label"></label><input asp-for="MaxAudioReplays" class="form-control" type="number" min="0" max="20" /><div class="form-text">Leave blank for unlimited replays.</div></div><div class="listening-learner-recording"><input asp-for="AllowsAudioRecording" class="form-check-input" /><label asp-for="AllowsAudioRecording" class="form-check-label">Allow learner audio recording</label><div class="form-text">This is the learner's answer recording, not the listening stimulus.</div></div></div>
+    </section>
+    <section class="listening-step" aria-labelledby="listening-accessibility-heading">
+        <div class="listening-step-heading"><span>5</span><div><h3 id="listening-accessibility-heading">Accessibility and transcript</h3><p>Provide a transcript so the stimulus remains accessible.</p></div></div>
+        <label asp-for="Transcript" class="form-label"></label><textarea asp-for="Transcript" class="form-control" rows="4" placeholder="Enter the spoken transcript..." data-audio-transcript></textarea>
+    </section>
+</fieldset>

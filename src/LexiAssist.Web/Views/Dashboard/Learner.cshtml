@@ -1,20 +1,21 @@
 @model LexiAssist.Web.ViewModels.LearnerDashboardViewModel
 @{
     ViewData["Title"] = "Learner dashboard";
+    var todayPracticeProgressMinutes = Math.Min(Model.TodayPractice.CompletedMinutes, Model.TodayPractice.TargetMinutes);
 }
 
-<section class="dashboard-page" aria-labelledby="dashboard-heading">
-    <header class="dashboard-heading">
+<section class="dashboard-page learner-dashboard-page" aria-labelledby="dashboard-heading">
+    <header class="dashboard-heading learner-page-heading">
         <p class="auth-eyebrow">Learner workspace</p>
         <h1 id="dashboard-heading">Learner dashboard</h1>
         <p class="learner-dashboard-intro">Your screening, practice, progress, and learning resources will be gathered here.</p>
     </header>
 
     <div class="learner-dashboard-grid">
-        <section id="screening" class="learner-dashboard-section" aria-labelledby="screening-heading">
+        <section id="screening" class="learner-dashboard-section learner-dashboard-section--screening" aria-labelledby="screening-heading">
             <h2 id="screening-heading">Start or continue screening</h2>
             <p class="learner-empty-state">Review the active categories and start or resume your educational screening.</p>
-            <a asp-controller="Screening" asp-action="Index" class="btn btn-outline-primary mt-3">Open screening</a>
+            <a asp-controller="Screening" asp-action="Index" class="btn btn-primary mt-3">Open screening</a>
         </section>
 
         <section id="screening-result" class="learner-dashboard-section" aria-labelledby="screening-result-heading">
@@ -58,7 +59,7 @@
             {
                 <p class="learner-dashboard-intro">You have logged @Model.TodayPractice.CompletedMinutes of @Model.TodayPractice.TargetMinutes minutes today. @Model.TodayPractice.RemainingMinutes minutes remain in your target.</p>
             }
-            <progress class="screening-progress w-100" value="@Math.Min(Model.TodayPractice.CompletedMinutes, Model.TodayPractice.TargetMinutes)" max="@Model.TodayPractice.TargetMinutes" aria-label="Today's practice progress">@Model.TodayPractice.CompletedMinutes of @Model.TodayPractice.TargetMinutes minutes</progress>
+            <progress class="screening-progress w-100" value="@todayPracticeProgressMinutes" max="@Model.TodayPractice.TargetMinutes" aria-label="Today's practice progress">@todayPracticeProgressMinutes of @Model.TodayPractice.TargetMinutes minutes toward today's target</progress>
             @if (Model.TodayPractice.RemindersEnabled)
             {
                 <p class="form-text mt-3">In-app reminders are on for @Model.TodayPractice.PreferredReminderTime.ToString("HH:mm").</p>

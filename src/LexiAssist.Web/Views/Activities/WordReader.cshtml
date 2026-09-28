@@ -127,7 +127,7 @@
             </form>
         </section>
     }
-    else
+    else if (string.IsNullOrWhiteSpace(Model.Message))
     {
         <p class="learner-empty-state">This practice assignment is not available right now. Please ask your support professional for help.</p>
     }

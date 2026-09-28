@@ -12,11 +12,12 @@ namespace LexiAssist.Web.Controllers;
 
 [Authorize(Roles = ApplicationRoles.Administrator)]
 [Route("admin/screening-tests")]
-public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext, IAuditService auditService) : Controller
+public sealed class AdminScreeningTestsController(
+    ApplicationDbContext dbContext,
+    IAuditService auditService,
+    IAssessmentReadinessService readinessService) : Controller
 {
     private const int IndexPageSize = 6;
-    private const string MemoryAndBroaderThinkingSkillsCategoryName = "Memory and Broader Thinking Skills";
-    private const string MemoryAndBroaderThinkingSkillsSlug = "memory-broader-thinking-skills";
 
     [HttpGet("")]
     public async Task<IActionResult> Index(string? search, int? page)
@@ -132,7 +133,7 @@ public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext
             Slug = slug,
             Description = model.Description.Trim(),
             Instructions = model.Instructions.Trim(),
-            IsActive = !IsMemoryAndBroaderThinkingSkills(model.Name, slug),
+            IsActive = false,
             SortOrder = sortOrder
         };
 
@@ -179,7 +180,7 @@ public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext
 
     [HttpPost("{id:int}/edit")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, AdminScreeningTestFormViewModel model)
+    public async Task<IActionResult> Edit(int id, AdminScreeningTestFormViewModel model, bool returnToBuilder = false)
     {
         if (id != model.Id)
         {
@@ -194,7 +195,9 @@ public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext
 
         if (!ModelState.IsValid)
         {
-            return View(model);
+            return returnToBuilder
+                ? View("~/Views/AdminAssessmentBuilder/Details.cshtml", model)
+                : View(model);
         }
 
         var slug = NormalizeSlug(model.Slug);
@@ -203,7 +206,9 @@ public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext
             ModelState.AddModelError(nameof(model.Slug), "A screening test with this slug already exists.");
             await auditService.RecordAsync(AuditActions.AdministrativeActionFailed, AuditEntityTypes.ScreeningTest, screeningTest.Id.ToString(), false,
                 new { Operation = "Edit", Reason = "DuplicateSlug" });
-            return View(model);
+            return returnToBuilder
+                ? View("~/Views/AdminAssessmentBuilder/Details.cshtml", model)
+                : View(model);
         }
 
         screeningTest.Name = model.Name.Trim();
@@ -215,7 +220,9 @@ public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext
             new { screeningTest.Slug });
 
         TempData["StatusMessage"] = "The screening test was updated.";
-        return RedirectToAction(nameof(Details), new { id = screeningTest.Id });
+        return returnToBuilder
+            ? RedirectToAction("Details", "AdminAssessmentBuilder", new { testId = screeningTest.Id })
+            : RedirectToAction(nameof(Details), new { id = screeningTest.Id });
     }
 
     [HttpPost("{id:int}/activate")]
@@ -226,6 +233,17 @@ public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext
         if (screeningTest is null)
         {
             return NotFound();
+        }
+
+        var readiness = await readinessService.GetReadinessAsync(id);
+        if (readiness is null)
+        {
+            return NotFound();
+        }
+        if (!readiness.IsReady)
+        {
+            TempData["ErrorMessage"] = readiness.ActivationFeedback;
+            return RedirectToAction(nameof(Details), new { id });
         }
 
         screeningTest.IsActive = true;
@@ -298,10 +316,6 @@ public sealed class AdminScreeningTestsController(ApplicationDbContext dbContext
             test.Slug == slug && (!exceptId.HasValue || test.Id != exceptId.Value));
 
     private static string NormalizeSlug(string slug) => slug.Trim().ToLowerInvariant();
-
-    private static bool IsMemoryAndBroaderThinkingSkills(string? name, string? slug) =>
-        string.Equals(name?.Trim(), MemoryAndBroaderThinkingSkillsCategoryName, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(slug?.Trim(), MemoryAndBroaderThinkingSkillsSlug, StringComparison.OrdinalIgnoreCase);
 
     private static AdminScreeningTestFormViewModel ToFormViewModel(ScreeningTest screeningTest) => new()
     {

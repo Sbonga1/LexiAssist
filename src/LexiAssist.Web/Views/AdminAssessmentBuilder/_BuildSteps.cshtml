@@ -1,0 +1,7 @@
+@model int
+<nav class="assessment-builder-steps" aria-label="Assessment authoring steps">
+            <a asp-action="Details" asp-route-testId="@Model">Details</a>
+            <span class="is-current" aria-current="step">Build</span>
+            <a asp-action="Configure" asp-route-testId="@Model">Configure</a>
+            <a asp-action="Review" asp-route-testId="@Model">Review</a>
+        </nav>

@@ -14,6 +14,14 @@ public sealed class ScreeningQuestionMetadata
 
     public int? MaxAudioReplays { get; set; }
 
+    public string? AudioSource { get; set; }
+
+    public int? AudioDurationSeconds { get; set; }
+
+    public string? Transcript { get; set; }
+
+    public string? ResponseType { get; set; }
+
     public List<string>? TimedNamingItems { get; set; }
 
     public List<string>? WorkingMemorySequence { get; set; }

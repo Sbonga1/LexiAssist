@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using LexiAssist.Web.Data;
 using LexiAssist.Web.Models.Identity;
 using LexiAssist.Web.Models.Screening;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,160 @@ public sealed class AdminScreeningQuestionsManagementTests
     }
 
     [Fact]
+    public async Task Question_authoring_workspace_saves_inactive_drafts_and_uses_existing_duplicate_and_next_flows()
+    {
+        using var factory = new LexiAssistWebApplicationFactory();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var (adminEmail, adminPassword) = await factory.CreateUserAsync(ApplicationRoles.Administrator);
+        await SignInAsync(client, adminEmail, adminPassword);
+
+        const int testId = 1;
+        var questionsUrl = $"/admin/screening-tests/{testId}/questions";
+        var createPage = await client.GetAsync($"{questionsUrl}/create?returnToBuilder=true");
+        var createHtml = await createPage.Content.ReadAsStringAsync();
+        Assert.True(createPage.StatusCode == HttpStatusCode.OK,
+            Regex.Match(createHtml, @"System\.InvalidOperationException: ([^\r\n<]+)").Groups[1].Value);
+        Assert.Contains("Question authoring workspace", createHtml);
+        Assert.Contains("Back to assessment", createHtml);
+        Assert.Contains("Use AI-assisted tools, your resource library, or create manually.", createHtml);
+        Assert.Contains("Save draft", createHtml);
+        Assert.Contains("Save &amp; next", createHtml);
+        Assert.Contains("Generate", createHtml);
+        Assert.Contains("Library", createHtml);
+        Assert.Contains("Import", createHtml);
+        Assert.Contains("action=\"/admin/screening-tests/1/builder/generate\"", createHtml);
+        Assert.Contains("href=\"/admin/screening-tests/1/builder/question-bank\"", createHtml);
+        Assert.Contains("action=\"/admin/screening-tests/1/builder/import\"", createHtml);
+        Assert.Contains("Candidate preview", createHtml);
+        Assert.Contains("data-move-option-up", createHtml);
+        Assert.Contains("data-move-option-down", createHtml);
+        Assert.DoesNotContain("True / False", createHtml);
+
+        var token = ExtractAntiForgeryToken(createHtml);
+        var candidatePreview = await client.PostAsync(
+            $"{questionsUrl}/create",
+            BuildForm(token, ScreeningQuestionType.MultipleChoice, "Choose the matching word.",
+                ("ChoiceOptionsText", "cat\ndog"),
+                ("CorrectAnswer", "dog"),
+                ("submitMode", "preview"),
+                ("returnToBuilder", "true")));
+        var candidatePreviewHtml = await candidatePreview.Content.ReadAsStringAsync();
+        Assert.True(candidatePreview.StatusCode == HttpStatusCode.OK,
+            Regex.Match(candidatePreviewHtml, @"System\.InvalidOperationException: ([^\r\n<]+)").Groups[1].Value);
+        Assert.Contains("Read-only candidate preview", candidatePreviewHtml);
+        Assert.Contains("Choose the matching word.", candidatePreviewHtml);
+        Assert.Contains("<li>cat</li>", candidatePreviewHtml);
+        Assert.Contains("<li>dog</li>", candidatePreviewHtml);
+        Assert.DoesNotContain("Correct answer", candidatePreviewHtml);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Empty(await dbContext.ScreeningQuestions.Where(question => question.ScreeningTestId == testId).ToListAsync());
+        }
+
+        var createResult = await client.PostAsync(
+            $"{questionsUrl}/create",
+            BuildForm(token, ScreeningQuestionType.MultipleChoice, "Choose the matching word.",
+                ("ChoiceOptionsText", "cat\ndog"),
+                ("CorrectAnswer", "dog"),
+                ("Weight", "2.5"),
+                ("__Invariant", "Weight"),
+                ("submitMode", "draft"),
+                ("returnToBuilder", "true")));
+
+        Assert.Equal(HttpStatusCode.Redirect, createResult.StatusCode);
+        var firstQuestionIdMatch = Regex.Match(GetLocationPath(createResult), @"questions/(\d+)/edit");
+        Assert.True(firstQuestionIdMatch.Success, "Saving a new draft should open its stable question ID for editing.");
+        var firstQuestionId = int.Parse(firstQuestionIdMatch.Groups[1].Value);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var firstQuestion = await dbContext.ScreeningQuestions.SingleAsync(question => question.Id == firstQuestionId);
+            Assert.Equal("dog", firstQuestion.CorrectAnswer);
+            Assert.Equal(2.5, firstQuestion.Weight);
+            Assert.False(firstQuestion.IsActive);
+        }
+
+        var editPage = await client.GetAsync($"{questionsUrl}/{firstQuestionId}/edit?returnToBuilder=true");
+        Assert.Equal(HttpStatusCode.OK, editPage.StatusCode);
+        var duplicateToken = ExtractAntiForgeryToken(await editPage.Content.ReadAsStringAsync());
+        var duplicateResult = await client.PostAsync(
+            $"{questionsUrl}/{firstQuestionId}/duplicate",
+            BuildActionForm(duplicateToken));
+
+        Assert.Equal(HttpStatusCode.Redirect, duplicateResult.StatusCode);
+        var duplicateIdMatch = Regex.Match(GetLocationPath(duplicateResult), @"questions/(\d+)/edit");
+        Assert.True(duplicateIdMatch.Success);
+        var duplicateQuestionId = int.Parse(duplicateIdMatch.Groups[1].Value);
+        Assert.NotEqual(firstQuestionId, duplicateQuestionId);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var duplicate = await dbContext.ScreeningQuestions.SingleAsync(question => question.Id == duplicateQuestionId);
+            Assert.Equal(firstQuestionId + 1, duplicate.SortOrder);
+            Assert.Equal("dog", duplicate.CorrectAnswer);
+            Assert.False(duplicate.IsActive);
+        }
+
+        var saveNextPage = await client.GetAsync($"{questionsUrl}/{firstQuestionId}/edit?returnToBuilder=true");
+        var saveNextToken = ExtractAntiForgeryToken(await saveNextPage.Content.ReadAsStringAsync());
+        var saveNextResult = await client.PostAsync(
+            $"{questionsUrl}/{firstQuestionId}/edit",
+            BuildForm(saveNextToken, ScreeningQuestionType.MultipleChoice, "Choose the matching word.",
+                ("Id", firstQuestionId.ToString()),
+                ("ChoiceOptionsText", "cat\ndog"),
+                ("CorrectAnswer", "dog"),
+                ("Weight", "2.5"),
+                ("__Invariant", "Weight"),
+                ("submitMode", "next"),
+                ("returnToBuilder", "true")));
+
+        Assert.Equal(HttpStatusCode.Redirect, saveNextResult.StatusCode);
+        Assert.Contains($"/questions/{duplicateQuestionId}/edit", GetLocationPath(saveNextResult));
+
+        var typeChangePage = await client.GetAsync($"{questionsUrl}/{firstQuestionId}/edit?returnToBuilder=true");
+        var typeChangeToken = ExtractAntiForgeryToken(await typeChangePage.Content.ReadAsStringAsync());
+        var unconfirmedTypeChange = await client.PostAsync(
+            $"{questionsUrl}/{firstQuestionId}/edit",
+            BuildForm(typeChangeToken, ScreeningQuestionType.TextResponse, "Choose the matching word.",
+                ("Id", firstQuestionId.ToString()),
+                ("CorrectAnswer", "answer"),
+                ("Weight", "2.5"),
+                ("__Invariant", "Weight"),
+                ("returnToBuilder", "true")));
+        Assert.Equal(HttpStatusCode.OK, unconfirmedTypeChange.StatusCode);
+        Assert.Contains("Select the new type again and confirm", await unconfirmedTypeChange.Content.ReadAsStringAsync());
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Equal(ScreeningQuestionType.MultipleChoice,
+                (await dbContext.ScreeningQuestions.SingleAsync(question => question.Id == firstQuestionId)).QuestionType);
+        }
+
+        var confirmedTypeChange = await client.PostAsync(
+            $"{questionsUrl}/{firstQuestionId}/edit",
+            BuildForm(typeChangeToken, ScreeningQuestionType.TextResponse, "Choose the matching word.",
+                ("Id", firstQuestionId.ToString()),
+                ("CorrectAnswer", "answer"),
+                ("Weight", "2.5"),
+                ("__Invariant", "Weight"),
+                ("ConfirmTypeChange", "true"),
+                ("returnToBuilder", "true")));
+        Assert.Equal(HttpStatusCode.Redirect, confirmedTypeChange.StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var updated = await dbContext.ScreeningQuestions.SingleAsync(question => question.Id == firstQuestionId);
+            Assert.Equal(ScreeningQuestionType.TextResponse, updated.QuestionType);
+            Assert.Equal("answer", updated.CorrectAnswer);
+            Assert.Null(updated.MetadataJson);
+            Assert.False(updated.IsActive);
+        }
+    }
+
+    [Fact]
     public async Task Administrator_can_create_edit_activate_deactivate_and_reorder_questions_with_type_validation()
     {
         using var factory = new LexiAssistWebApplicationFactory();
@@ -62,7 +217,8 @@ public sealed class AdminScreeningQuestionsManagementTests
         var createPage = await client.GetAsync($"{questionsUrl}/create");
         Assert.Equal(HttpStatusCode.OK, createPage.StatusCode);
         var createHtml = await createPage.Content.ReadAsStringAsync();
-        Assert.Contains("data-question-types=\"1,5,12,13\"", createHtml);
+        Assert.Contains("data-question-type-choice=\"1\"", createHtml);
+        Assert.Contains("data-question-types=\"1\"", createHtml);
         Assert.Contains("data-question-types=\"8,10\"", createHtml);
         Assert.Contains("screening-question-form.js", createHtml);
         var createToken = ExtractAntiForgeryToken(createHtml);
@@ -289,21 +445,58 @@ public sealed class AdminScreeningQuestionsManagementTests
                 ("AudioPath", "second-story.wav")));
         Assert.Equal(HttpStatusCode.Redirect, defaultReplayResult.StatusCode);
 
+        var environment = factory.Services.GetRequiredService<IWebHostEnvironment>();
+        var audioDirectory = Path.Combine(environment.ContentRootPath, "App_Data", "ScreeningAudio");
+        Directory.CreateDirectory(audioDirectory);
+        var audioPath = Path.Combine(audioDirectory, "listening-composer-test.wav");
+        await File.WriteAllBytesAsync(audioPath, [1, 2, 3, 4]);
+        try
+        {
+            var composerResult = await client.PostAsync(
+                $"{questionsUrl}/create",
+                BuildForm(antiForgeryToken, ScreeningQuestionType.ListeningResponse, "What did the speaker pack?",
+                    ("AudioPath", "listening-composer-test.wav"),
+                    ("ListeningComposerEnabled", "true"),
+                    ("ListeningResponseType", "multiple-choice"),
+                    ("ChoiceOptionsText", "A lunch bag.\nA suitcase."),
+                    ("SelectedCorrectAnswer", "A lunch bag."),
+                    ("MaxAudioReplays", "2"),
+                    ("Transcript", "I packed my lunch in a blue bag.")));
+            Assert.Equal(HttpStatusCode.Redirect, composerResult.StatusCode);
+        }
+        finally
+        {
+            if (File.Exists(audioPath)) File.Delete(audioPath);
+        }
+
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var questions = await dbContext.ScreeningQuestions
             .Where(item => item.ScreeningTestId == testId && item.QuestionType == ScreeningQuestionType.ListeningResponse)
             .OrderBy(item => item.SortOrder)
             .ToListAsync();
-        Assert.Equal(2, questions.Count);
+        Assert.Equal(3, questions.Count);
         Assert.Equal("story.mp3", questions[0].AudioPath);
         using var metadata = JsonDocument.Parse(questions[0].MetadataJson!);
         Assert.Equal(2, metadata.RootElement.GetProperty("maxAudioReplays").GetInt32());
         Assert.Equal("second-story.wav", questions[1].AudioPath);
         Assert.Null(questions[1].MetadataJson);
+        Assert.Equal("A lunch bag.", questions[2].CorrectAnswer);
+        Assert.Equal("listening-composer-test.wav", questions[2].AudioPath);
+        using var composerMetadata = JsonDocument.Parse(questions[2].MetadataJson!);
+        Assert.Equal("multiple-choice", composerMetadata.RootElement.GetProperty("responseType").GetString());
+        Assert.Equal(
+            new[] { "A lunch bag.", "A suitcase." },
+            composerMetadata.RootElement.GetProperty("choiceOptions").EnumerateArray().Select(item => item.GetString()).ToArray());
+        Assert.Equal(2, composerMetadata.RootElement.GetProperty("maxAudioReplays").GetInt32());
+        Assert.Equal("I packed my lunch in a blue bag.", composerMetadata.RootElement.GetProperty("transcript").GetString());
 
         var editPage = await client.GetAsync($"{questionsUrl}/{questions[0].Id}/edit");
         Assert.Contains("value=\"2\"", await editPage.Content.ReadAsStringAsync());
+        var composerEditPage = await client.GetAsync($"{questionsUrl}/{questions[2].Id}/edit");
+        var composerEditHtml = await composerEditPage.Content.ReadAsStringAsync();
+        Assert.Contains("value=\"A lunch bag.\"", composerEditHtml);
+        Assert.Contains("value=\"A suitcase.\"", composerEditHtml);
     }
 
     [Fact]

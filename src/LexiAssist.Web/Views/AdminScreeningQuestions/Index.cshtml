@@ -3,93 +3,139 @@
     ViewData["Title"] = "Questions";
 }
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-    <div>
-        <p class="auth-eyebrow">Administration · Screening Tests</p>
-        <h1 class="h2 mb-1">Questions</h1>
-        <p class="text-secondary mb-0">@Model.ScreeningTestName</p>
-    </div>
-    <div class="d-flex flex-wrap gap-2">
-        <a asp-action="Create" asp-route-testId="@Model.ScreeningTestId" class="btn btn-primary">Create question</a>
-        <a asp-controller="AdminScreeningTests" asp-action="Details" asp-route-id="@Model.ScreeningTestId" class="btn btn-outline-secondary">Back to test details</a>
-    </div>
-</div>
+<section class="admin-screening-questions-page" aria-labelledby="screening-questions-heading">
+    <header class="admin-screening-questions-heading">
+        <div class="admin-screening-questions-heading-copy">
+            <p class="auth-eyebrow">Administration · Screening Tests</p>
+            <h1 id="screening-questions-heading">Questions</h1>
+            <p class="admin-screening-questions-test-name">@Model.ScreeningTestName</p>
+        </div>
+        <nav class="admin-screening-questions-heading-actions" aria-label="Question page actions">
+            <a asp-controller="AdminAssessmentBuilder" asp-action="Index" asp-route-testId="@Model.ScreeningTestId" class="admin-screening-questions-back">
+                <span>Assessment Builder</span>
+            </a>
+            <a asp-action="Create" asp-route-testId="@Model.ScreeningTestId" class="admin-screening-questions-create">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>
+                <span>Create question</span>
+            </a>
+            <a asp-controller="AdminScreeningTests" asp-action="Details" asp-route-id="@Model.ScreeningTestId" class="admin-screening-questions-back">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>
+                <span>Back to test details</span>
+            </a>
+        </nav>
+    </header>
 
-@if (TempData["StatusMessage"] is string statusMessage)
-{
-    <div class="alert alert-success" role="status">@statusMessage</div>
-}
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
 
-<div class="table-responsive bg-white border rounded-3">
-    <table class="table table-hover align-middle mb-0">
-        <caption class="visually-hidden">Questions configured for this screening test</caption>
-        <thead class="table-light">
-            <tr>
-                <th scope="col">Order</th>
-                <th scope="col">Prompt</th>
-                <th scope="col">Type</th>
-                <th scope="col">Status</th>
-                <th scope="col" class="text-end">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        @if (Model.Questions.Count == 0)
-        {
-            <tr><td colspan="5" class="text-center text-secondary py-4">No questions have been added to this test.</td></tr>
-        }
-        else
-        {
-            @for (var index = 0; index < Model.Questions.Count; index++)
-            {
-                var question = Model.Questions[index];
-                <tr>
-                    <td>@question.SortOrder</td>
-                    <td class="fw-semibold">@question.Prompt</td>
-                    <td>@question.QuestionTypeName</td>
-                    <td>
-                        @if (question.IsActive)
-                        {
-                            <span class="badge text-bg-success">Active</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-secondary">Inactive</span>
-                        }
-                    </td>
-                    <td>
-                        <div class="d-flex flex-wrap justify-content-end gap-1">
-                            <a asp-action="Edit" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" class="btn btn-sm btn-outline-primary">View / edit</a>
-                            <form asp-action="Move" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post" class="d-inline">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="direction" value="up" />
-                                <button type="submit" class="btn btn-sm btn-outline-secondary" aria-label="Move question up" disabled="@(index == 0 ? "disabled" : null)">↑</button>
-                            </form>
-                            <form asp-action="Move" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post" class="d-inline">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="direction" value="down" />
-                                <button type="submit" class="btn btn-sm btn-outline-secondary" aria-label="Move question down" disabled="@(index == Model.Questions.Count - 1 ? "disabled" : null)">↓</button>
-                            </form>
-                            @if (question.IsActive)
-                            {
-                                <form asp-action="Deactivate" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Deactivate</button>
-                                </form>
-                            }
-                            else
-                            {
-                                <form asp-action="Activate" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm btn-outline-success">Activate</button>
-                                </form>
-                            }
-                        </div>
-                    </td>
-                </tr>
-            }
-        }
-        </tbody>
-    </table>
-</div>
+    <section class="admin-screening-questions-panel" aria-labelledby="screening-questions-panel-heading">
+        <header class="admin-screening-questions-panel-heading">
+            <span class="admin-screening-questions-panel-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M6.5 3.5h8l3 3v14h-11Z"></path>
+                    <path d="M14.5 3.5v3h3M9 11h6M9 14.5h6M9 18h6"></path>
+                </svg>
+            </span>
+            <div>
+                <h2 id="screening-questions-panel-heading">Test questions</h2>
+                <p>Manage the questions for this screening test. You can add, edit or deactivate questions.</p>
+            </div>
+        </header>
 
-<p class="small text-secondary mt-3 mb-0">Questions are deactivated instead of deleted so related records can be preserved.</p>
+        <div class="admin-screening-questions-table-wrap @(Model.Questions.Count == 0 ? "is-empty" : "is-populated")">
+            <table class="admin-screening-questions-table">
+                <caption class="visually-hidden">Questions configured for this screening test</caption>
+                <colgroup>
+                    <col class="admin-screening-questions-col-order" />
+                    <col class="admin-screening-questions-col-prompt" />
+                    <col class="admin-screening-questions-col-type" />
+                    <col class="admin-screening-questions-col-status" />
+                    <col class="admin-screening-questions-col-actions" />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th scope="col">Order</th>
+                        <th scope="col">Prompt</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="admin-screening-questions-actions-heading">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Questions.Count == 0)
+                {
+                    <tr class="admin-screening-questions-empty-row">
+                        <td colspan="5">
+                            <div class="admin-screening-questions-empty-state">
+                                <span class="admin-screening-questions-empty-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M6.5 3.5h8l3 3v14h-11Z"></path>
+                                        <path d="M14.5 3.5v3h3M9 11h6M9 14.5h6M9 18h6"></path>
+                                    </svg>
+                                </span>
+                                <p class="admin-screening-questions-empty-title">No questions have been added to this test yet.</p>
+                                <p class="admin-screening-questions-empty-copy">Use the button above to create the first question.</p>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @for (var index = 0; index < Model.Questions.Count; index++)
+                    {
+                        var question = Model.Questions[index];
+                        <tr>
+                            <td class="admin-screening-questions-order">@question.SortOrder</td>
+                            <td class="admin-screening-questions-prompt">@question.Prompt</td>
+                            <td class="admin-screening-questions-type">@question.QuestionTypeName</td>
+                            <td>
+                                @if (question.IsActive)
+                                {
+                                    <span class="admin-screening-question-status admin-screening-question-status-active"><span class="admin-screening-question-status-dot" aria-hidden="true"></span>Active</span>
+                                }
+                                else
+                                {
+                                    <span class="admin-screening-question-status admin-screening-question-status-inactive"><span class="admin-screening-question-status-dot" aria-hidden="true"></span>Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="admin-screening-question-actions">
+                                    <a asp-action="Edit" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" class="admin-screening-question-action">View / edit</a>
+                                    <form asp-action="Move" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="direction" value="up" />
+                                        <button type="submit" class="admin-screening-question-icon-action" aria-label="Move question up" disabled="@(index == 0 ? "disabled" : null)">↑</button>
+                                    </form>
+                                    <form asp-action="Move" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="direction" value="down" />
+                                        <button type="submit" class="admin-screening-question-icon-action" aria-label="Move question down" disabled="@(index == Model.Questions.Count - 1 ? "disabled" : null)">↓</button>
+                                    </form>
+                                    @if (question.IsActive)
+                                    {
+                                        <form asp-action="Deactivate" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="admin-screening-question-action admin-screening-question-action-danger">Deactivate</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="Activate" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="admin-screening-question-action admin-screening-question-action-success">Activate</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <p class="admin-screening-questions-preservation-note">Questions are deactivated instead of deleted so related records can be preserved.</p>
+</section>

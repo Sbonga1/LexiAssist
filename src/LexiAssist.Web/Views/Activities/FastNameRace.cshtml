@@ -53,7 +53,7 @@
     {
         <section class="admin-details-card" aria-labelledby="ready-heading">
             <h2 id="ready-heading" class="h3">Ready when you are</h2>
-            <p>This activity has @Model.Items.Count familiar items and lasts up to @Model.DurationSeconds seconds. Read each highlighted item aloud, then move to the next one. You can pause at any time.</p>
+            <p>Name each familiar item at a comfortable pace. This activity lasts up to @Model.DurationSeconds seconds. Read each highlighted item aloud, then move to the next one. You can pause at any time.</p>
             <p>Use a comfortable pace. This activity is practice and does not make a diagnosis.</p>
             <form asp-action="StartFastNameRace" asp-route-assignmentId="@Model.AssignmentId" method="post">
                 @Html.AntiForgeryToken()

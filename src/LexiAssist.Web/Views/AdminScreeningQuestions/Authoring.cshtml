@@ -1,0 +1,223 @@
+@model LexiAssist.Web.ViewModels.AdminScreeningTests.AdminScreeningQuestionFormViewModel
+@using LexiAssist.Web.Models.Screening
+@{
+    var isEdit = Model.Id > 0;
+    var testId = (int)(ViewData["ScreeningTestId"] ?? 0);
+    var testName = (string?)ViewData["ScreeningTestName"] ?? "Screening assessment";
+    var returnPage = (int)(ViewData["ReturnPage"] ?? 1);
+    var originalQuestionType = (int?)ViewData["OriginalQuestionType"] ?? (int)Model.QuestionType;
+    var currentQuestionTypeName = Model.QuestionType switch
+    {
+        ScreeningQuestionType.MultipleChoice => "Multiple choice",
+        ScreeningQuestionType.TextResponse => "Text response",
+        ScreeningQuestionType.WordReading => "Word reading",
+        ScreeningQuestionType.NonWordReading => "Non-word reading",
+        ScreeningQuestionType.PhonologicalChoice => "Phonological choice",
+        ScreeningQuestionType.TimedNaming => "Timed naming",
+        ScreeningQuestionType.Spelling => "Spelling",
+        ScreeningQuestionType.ReadingPassage => "Reading comprehension",
+        ScreeningQuestionType.ListeningResponse => "Listening comprehension",
+        ScreeningQuestionType.ReadingFluency => "Reading fluency",
+        ScreeningQuestionType.WorkingMemorySequence => "Working memory sequence",
+        ScreeningQuestionType.TimedMatching => "Timed matching",
+        ScreeningQuestionType.PatternReasoning => "Pattern reasoning",
+        _ => "Question"
+    };
+    var questionTypes = new (ScreeningQuestionType Type, string Name, string Summary)[]
+    {
+        (ScreeningQuestionType.MultipleChoice, "Multiple choice", "One correct answer from a list."),
+        (ScreeningQuestionType.TextResponse, "Text response", "Learner enters a written response."),
+        (ScreeningQuestionType.WordReading, "Word reading", "Learner reads a word aloud."),
+        (ScreeningQuestionType.NonWordReading, "Non-word reading", "Learner reads an original made-up word."),
+        (ScreeningQuestionType.PhonologicalChoice, "Phonological choice", "Choose a sound or word response."),
+        (ScreeningQuestionType.TimedNaming, "Timed naming", "Name a sequence of 20 items."),
+        (ScreeningQuestionType.Spelling, "Spelling", "Learner enters a spelling response."),
+        (ScreeningQuestionType.ReadingPassage, "Reading comprehension", "Answer a question about a passage."),
+        (ScreeningQuestionType.ListeningResponse, "Listening comprehension", "Listen to an audio stimulus and respond."),
+        (ScreeningQuestionType.ReadingFluency, "Reading fluency", "Read a passage aloud in a timed activity."),
+        (ScreeningQuestionType.WorkingMemorySequence, "Working memory sequence", "Recall a short displayed sequence."),
+        (ScreeningQuestionType.TimedMatching, "Timed matching", "Match items using a reference mapping."),
+        (ScreeningQuestionType.PatternReasoning, "Pattern reasoning", "Choose the completion for an original pattern.")
+    };
+    var isListening = Model.QuestionType == ScreeningQuestionType.ListeningResponse;
+    ViewData["Title"] = isListening ? "Listening question" : testName;
+}
+
+<section class="question-authoring-page" aria-labelledby="question-authoring-heading" data-question-authoring
+         data-original-question-type="@originalQuestionType" data-question-mode="@(isEdit ? "edit" : "create")">
+    <header class="question-authoring-topbar">
+        <div class="question-authoring-top-actions">
+            <a asp-controller="AdminAssessmentBuilder" asp-action="Index" asp-route-testId="@testId" asp-route-page="@returnPage" class="question-authoring-button question-authoring-button-secondary">← <span>Back to assessment</span></a>
+            <button type="submit" form="questionAuthoringForm" name="submitMode" value="draft" class="question-authoring-button question-authoring-button-secondary">▣ <span>Save draft</span></button>
+            <button type="submit" form="questionAuthoringForm" name="submitMode" value="preview" formtarget="_blank" class="question-authoring-button question-authoring-button-secondary">◉ <span>Candidate preview</span></button>
+            <button type="submit" form="questionAuthoringForm" name="submitMode" value="next" class="question-authoring-button question-authoring-button-primary">Save &amp; next <span aria-hidden="true">→</span></button>
+        </div>
+    </header>
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="alert">@errorMessage</div>
+    }
+
+    <div class="question-authoring-heading-row">
+        <div>
+            <p class="question-authoring-eyebrow">Administration · Screening tests · @testName</p>
+            <h1 id="question-authoring-heading" data-authoring-heading>@(isListening ? "Listening question" : "Question authoring workspace")</h1>
+            <p data-authoring-support>@(isListening ? "Add an audio stimulus, define the learner task and preview the candidate experience." : "Create, edit and manage questions for this assessment. Use AI-assisted tools, your resource library, or create manually.")</p>
+        </div>
+        <span class="question-authoring-save-note">Changes save when you choose Save draft or Save &amp; next.</span>
+    </div>
+
+    <div class="question-authoring-layout">
+        <aside class="question-authoring-type-panel" aria-labelledby="question-type-heading">
+            <header>
+                <h2 id="question-type-heading">Question type</h2>
+                <p>Select a type that is supported by this assessment.</p>
+            </header>
+            <div class="question-authoring-type-list" role="group" aria-label="Supported question types">
+                @foreach (var questionType in questionTypes)
+                {
+                    <button type="button" class="question-authoring-type-card @(Model.QuestionType == questionType.Type ? "is-selected" : string.Empty)"
+                            data-question-type-choice="@((int)questionType.Type)" data-type-name="@questionType.Name" aria-pressed="@(Model.QuestionType == questionType.Type ? "true" : "false")">
+                        <span class="question-authoring-type-icon" aria-hidden="true">@(questionType.Type switch
+                        {
+                            ScreeningQuestionType.MultipleChoice or ScreeningQuestionType.PhonologicalChoice or ScreeningQuestionType.PatternReasoning => "☷",
+                            ScreeningQuestionType.WordReading or ScreeningQuestionType.NonWordReading or ScreeningQuestionType.ReadingFluency => "◖",
+                            ScreeningQuestionType.ListeningResponse => "♫",
+                            ScreeningQuestionType.TimedNaming or ScreeningQuestionType.TimedMatching => "◷",
+                            ScreeningQuestionType.WorkingMemorySequence => "▦",
+                            ScreeningQuestionType.ReadingPassage => "▤",
+                            _ => "≡"
+                        })</span>
+                        <span><strong>@questionType.Name</strong><small>@questionType.Summary</small></span>
+                    </button>
+                }
+            </div>
+            <span asp-validation-for="QuestionType" class="text-danger small"></span>
+        </aside>
+
+        <form id="questionAuthoringForm" class="question-authoring-details" asp-controller="AdminScreeningQuestions"
+              asp-action="@(isEdit ? "Edit" : "Create")" asp-route-testId="@testId" asp-route-questionId="@Model.Id" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            @if (isEdit)
+            {
+                <input asp-for="Id" type="hidden" />
+            }
+            <input type="hidden" name="returnToBuilder" value="true" />
+            <input type="hidden" name="returnPage" value="@returnPage" />
+
+            <section class="question-authoring-detail-card" aria-labelledby="question-details-heading">
+                <header class="question-authoring-detail-header">
+                    <span class="question-authoring-detail-icon" aria-hidden="true">▤</span>
+                    <div>
+                        <h2 id="question-details-heading" data-detail-heading>@(isListening ? "Listening question details" : "Question details")</h2>
+                        <p data-detail-support>@(isListening ? "Configure the audio source, question task, answers and settings for this listening question." : $"Enter the prompt, select the correct response, then configure the settings for {currentQuestionTypeName}.")</p>
+                    </div>
+                    <div class="question-authoring-editor-toggle" role="group" aria-label="Question view">
+                        <button type="button" class="is-selected" aria-pressed="true" data-editor-toggle>Editor</button>
+                        <button type="submit" name="submitMode" value="preview" formtarget="_blank" aria-pressed="false">Preview</button>
+                    </div>
+                </header>
+
+                <div asp-validation-summary="All" class="alert alert-danger question-authoring-validation" role="alert"></div>
+                @if (isEdit)
+                {
+                    <p class="question-authoring-existing-status">This question keeps its current active or inactive status when you save edits.</p>
+                }
+                else
+                {
+                    <p class="question-authoring-draft-note">New questions are saved as inactive drafts. Review and activate them from the builder when ready.</p>
+                }
+
+                <div class="question-authoring-editor" data-question-editor>
+                    <partial name="_QuestionFormFields" model="Model" />
+                </div>
+                <div class="question-authoring-detail-footer">
+                    <div class="question-authoring-secondary-actions">
+                        @if (isEdit)
+                        {
+                            <button type="submit" class="question-authoring-button question-authoring-button-secondary" formaction="@Url.Action("Duplicate", "AdminScreeningQuestions", new { testId, questionId = Model.Id, returnToBuilder = true, returnPage })">▣ <span>Duplicate question</span></button>
+                            @if (ViewData["QuestionIsActive"] is true)
+                            {
+                                <button type="submit" class="question-authoring-button question-authoring-button-danger" formaction="@Url.Action("Deactivate", "AdminScreeningQuestions", new { testId, questionId = Model.Id, returnToBuilder = true, returnPage })">Deactivate question</button>
+                            }
+                        }
+                    </div>
+                    <button type="submit" form="questionAuthoringForm" name="submitMode" value="draft" class="question-authoring-button question-authoring-button-primary">Save draft</button>
+                </div>
+            </section>
+        </form>
+
+        <aside class="question-authoring-smart" aria-labelledby="smart-authoring-heading">
+            <header class="question-authoring-smart-heading">
+                <span aria-hidden="true">✦</span>
+                <div>
+                    <h2 id="smart-authoring-heading">Smart authoring</h2>
+                    <p>Use the existing AI, library and CSV tools.</p>
+                </div>
+            </header>
+            <div class="question-authoring-smart-tabs" role="tablist" aria-label="Smart authoring tools">
+                <button type="button" role="tab" aria-selected="true" class="is-selected" data-smart-tab="generate">Generate</button>
+                <button type="button" role="tab" aria-selected="false" data-smart-tab="library">Library</button>
+                <button type="button" role="tab" aria-selected="false" data-smart-tab="import">Import</button>
+            </div>
+
+            <section class="question-authoring-smart-panel" role="tabpanel" data-smart-panel="generate">
+                @if (ViewData["OpenAiConfigured"] is true)
+                {
+                    <p>Generate draft questions from this assessment's saved purpose and existing prompts.</p>
+                    <form asp-controller="AdminAssessmentBuilder" asp-action="Generate" asp-route-testId="@testId" method="post" class="question-authoring-tool-form">
+                        @Html.AntiForgeryToken()
+                        <label for="authoring-question-count">Number of questions</label>
+                        <select id="authoring-question-count" name="QuestionCount">
+                            @for (var count = 5; count <= 20; count += 5)
+                            {
+                                <option value="@count" selected="@(count == 10)">@count</option>
+                            }
+                        </select>
+                        <label for="authoring-difficulty-mix">Difficulty mix</label>
+                        <select id="authoring-difficulty-mix" name="DifficultyMix">
+                            <option>Balanced</option>
+                            <option>Mostly accessible</option>
+                            <option>Progressive challenge</option>
+                        </select>
+                        <p class="question-authoring-tool-note">Submitting sends this assessment’s title, description, instructions, requested question count, selected difficulty mix, and existing question prompts to OpenAI. Do not include learner information in assessment details.</p>
+                        <p class="question-authoring-tool-note">The existing generator creates a review draft. Nothing is added until you select questions in its review step.</p>
+                        <button type="submit" class="question-authoring-button question-authoring-button-primary">✦ Generate draft questions</button>
+                    </form>
+                }
+                else
+                {
+                    <p>AI question generation is not configured. Set <code>OPENAI_API_KEY</code> for the application to enable the existing generator.</p>
+                }
+            </section>
+
+            <section class="question-authoring-smart-panel" role="tabpanel" data-smart-panel="library" hidden>
+                <p>Search the existing question bank and copy a question into this assessment as an inactive draft.</p>
+                <a asp-controller="AdminAssessmentBuilder" asp-action="QuestionBank" asp-route-testId="@testId" class="question-authoring-button question-authoring-button-secondary">Browse question library →</a>
+            </section>
+
+            <section class="question-authoring-smart-panel" role="tabpanel" data-smart-panel="import" hidden>
+                <p>Use the existing CSV importer. Rows are validated before any questions are saved.</p>
+                <a asp-controller="AdminAssessmentBuilder" asp-action="ImportTemplate" asp-route-testId="@testId" class="question-authoring-template-link">Download CSV template</a>
+                <form asp-controller="AdminAssessmentBuilder" asp-action="Import" asp-route-testId="@testId" method="post" enctype="multipart/form-data" class="question-authoring-tool-form">
+                    @Html.AntiForgeryToken()
+                    <label for="question-csv-file">Choose CSV file</label>
+                    <input id="question-csv-file" name="csvFile" type="file" accept=".csv,text/csv" />
+                    <p class="question-authoring-tool-note">CSV only · up to 2 MB · imported questions start inactive</p>
+                    <button type="submit" class="question-authoring-button question-authoring-button-secondary">Import questions</button>
+                </form>
+            </section>
+            <div class="question-authoring-tool-tip"><strong>Review every draft</strong><span>Generated, copied and imported questions stay inactive until an administrator activates them.</span></div>
+        </aside>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/screening-question-form.js" asp-append-version="true"></script>
+}

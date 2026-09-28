@@ -1,134 +1,142 @@
 @model LexiAssist.Web.ViewModels.AdminScreeningTests.AdminScreeningQuestionFormViewModel
+@using LexiAssist.Web.Models.Screening
+@{
+    var selectedTypeCode = ((int)Model.QuestionType).ToString();
+    bool SupportsType(string typeCodes) => typeCodes.Split(',').Contains(selectedTypeCode, StringComparer.Ordinal);
+}
 
-<div class="mb-3">
-    <label asp-for="Prompt" class="form-label"></label>
-    <textarea asp-for="Prompt" class="form-control" rows="3" autofocus></textarea>
-    <div class="form-text" data-reading-stimulus-help hidden>For Word reading and Non-word reading, enter only the word or made-up word that the learner will see.</div>
-    <span asp-validation-for="Prompt" aria-live="polite" class="text-danger small"></span>
+<input type="hidden" name="QuestionType" value="@((int)Model.QuestionType)" data-question-type-selector />
+<input type="hidden" id="confirmTypeChange" name="ConfirmTypeChange" value="@Model.ConfirmTypeChange.ToString().ToLowerInvariant()" data-confirm-type-change />
+
+<partial name="_ListeningQuestionFields" model="Model" />
+
+<div class="question-authoring-field" data-common-question-fields>
+    <label asp-for="Prompt" class="form-label">Question prompt <span aria-hidden="true">*</span></label>
+    <textarea asp-for="Prompt" class="form-control" rows="5" placeholder="Enter the question prompt..." data-question-prompt></textarea>
+    <div class="form-text" data-reading-stimulus-help hidden>For word reading and non-word reading, enter only the word or made-up word that the learner will see.</div>
+    <span asp-validation-for="Prompt" class="text-danger small"></span>
 </div>
 
-<div class="mb-3">
-    <label asp-for="QuestionType" class="form-label"></label>
-    <select asp-for="QuestionType" asp-items="Html.GetEnumSelectList<LexiAssist.Web.Models.Screening.ScreeningQuestionType>()" class="form-select" data-question-type-selector></select>
-    <span asp-validation-for="QuestionType" aria-live="polite" class="text-danger small"></span>
+<div class="question-authoring-field question-authoring-field-compact" data-common-question-fields>
+    <label asp-for="Weight" class="form-label"></label>
+    <input asp-for="Weight" class="form-control" type="number" min="0.1" max="100" step="0.1" />
+    <div class="form-text">Weight is used by the existing screening score.</div>
+    <span asp-validation-for="Weight" class="text-danger small"></span>
 </div>
 
-<fieldset class="mb-3 border rounded p-3">
-    <legend class="fs-6">Learner voice recording</legend>
-    <div class="form-check">
-        <input asp-for="AllowsAudioRecording" class="form-check-input" />
-        <label asp-for="AllowsAudioRecording" class="form-check-label"></label>
+<fieldset class="question-authoring-type-fields" data-question-types="1" hidden="@(!SupportsType("1"))" disabled="@(!SupportsType("1"))" data-listening-choice-fields>
+    <legend class="visually-hidden">Multiple choice settings</legend>
+    <div class="question-authoring-field">
+        <div class="question-authoring-label-row"><label class="form-label" for="answer-options-list">Answer options <span aria-hidden="true">*</span></label><span class="question-authoring-inline-help">Choose the correct option below</span></div>
+        <div class="question-authoring-option-list" id="answer-options-list" data-answer-options>
+            @for (var i = 0; i < Model.AnswerOptions.Count; i++)
+            {
+                <div class="question-authoring-option-row">
+                    <span class="question-authoring-option-letter" data-option-letter>@((char)('A' + i))</span>
+                    <input type="radio" name="SelectedCorrectAnswer" value="@Model.AnswerOptions[i]" aria-label="Mark option @((char)('A' + i)) as the correct answer" data-correct-option checked="@(string.Equals(Model.AnswerOptions[i], Model.CorrectAnswer, StringComparison.OrdinalIgnoreCase) ? "checked" : null)" />
+                    <input class="form-control" name="AnswerOptions[@i]" value="@Model.AnswerOptions[i]" maxlength="2000" aria-label="Answer option @((char)('A' + i))" data-answer-option />
+                    <span class="question-authoring-option-move-controls">
+                        <button type="button" class="question-authoring-move-button" aria-label="Move option @((char)('A' + i)) up" data-move-option-up>↑</button>
+                        <button type="button" class="question-authoring-move-button" aria-label="Move option @((char)('A' + i)) down" data-move-option-down>↓</button>
+                    </span>
+                    <button type="button" class="question-authoring-icon-button" aria-label="Remove option @((char)('A' + i))" data-remove-option>×</button>
+                </div>
+            }
+        </div>
+        <button type="button" class="question-authoring-add-option" data-add-option>＋ Add option</button>
+        <input type="hidden" id="multipleChoiceOptions" name="ChoiceOptionsText" value="@Model.ChoiceOptionsText" data-choice-options-value />
+        <input type="hidden" id="choiceCorrectAnswer" name="CorrectAnswer" value="@Model.CorrectAnswer" data-choice-correct-answer />
+        <span asp-validation-for="ChoiceOptionsText" class="text-danger small"></span>
+        <span asp-validation-for="CorrectAnswer" class="text-danger small"></span>
     </div>
-    <p class="form-text mb-0">When enabled, the learner may choose to record a response. Recordings are private and require the learner's consent.</p>
 </fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="1,5,12,13" hidden>
-    <label asp-for="ChoiceOptionsText" class="form-label"></label>
-    <textarea asp-for="ChoiceOptionsText" class="form-control" rows="4" aria-describedby="choice-options-help"></textarea>
-    <div id="choice-options-help" class="form-text">Enter one choice per line.</div>
-    <span asp-validation-for="ChoiceOptionsText" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="5,12,13" hidden="@(!SupportsType("5,12,13"))" disabled="@(!SupportsType("5,12,13"))">
+    <legend class="visually-hidden">Answer choices and correct answer</legend>
+    <div class="question-authoring-field">
+        <label asp-for="ChoiceOptionsText" class="form-label"></label>
+        <textarea asp-for="ChoiceOptionsText" class="form-control" rows="4" placeholder="Enter one choice per line..."></textarea>
+        <div class="form-text">Enter one choice per line. For timed matching, include every symbol used by the reference pairs.</div>
+        <span asp-validation-for="ChoiceOptionsText" class="text-danger small"></span>
+    </div>
+    <div class="question-authoring-field">
+        <label asp-for="CorrectAnswer" class="form-label"></label>
+        <input asp-for="CorrectAnswer" class="form-control" placeholder="Enter the correct answer" />
+        <span asp-validation-for="CorrectAnswer" class="text-danger small"></span>
+    </div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="1,2,3,4,5,7,11,13" hidden>
-    <label asp-for="CorrectAnswer" class="form-label"></label>
-    <input asp-for="CorrectAnswer" class="form-control" />
-    <span asp-validation-for="CorrectAnswer" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="2,3,4,7,11" hidden="@(!SupportsType("2,3,4,7,11"))" disabled="@(!SupportsType("2,3,4,7,11"))">
+    <legend class="visually-hidden">Expected response</legend>
+    <div class="question-authoring-field">
+        <label asp-for="CorrectAnswer" class="form-label"></label>
+        <input asp-for="CorrectAnswer" class="form-control" placeholder="Enter the expected response" />
+        <span asp-validation-for="CorrectAnswer" class="text-danger small"></span>
+    </div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="2,3,4,7,8,9,11" hidden>
-    <label asp-for="AcceptedAnswersText" class="form-label"></label>
-    <textarea asp-for="AcceptedAnswersText" class="form-control" rows="4" aria-describedby="accepted-answers-help"></textarea>
-    <div id="accepted-answers-help" class="form-text">Enter one accepted response per line. Leave blank for open responses.</div>
-    <span asp-validation-for="AcceptedAnswersText" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="2,3,4,7,8,11" hidden="@(!SupportsType("2,3,4,7,8,11"))" disabled="@(!SupportsType("2,3,4,7,8,11"))">
+    <legend class="visually-hidden">Accepted answers</legend>
+    <div class="question-authoring-field">
+        <label asp-for="AcceptedAnswersText" class="form-label"></label>
+        <textarea asp-for="AcceptedAnswersText" class="form-control" rows="4"></textarea>
+        <div class="form-text">Optional. Enter one accepted response per line.</div>
+        <span asp-validation-for="AcceptedAnswersText" class="text-danger small"></span>
+    </div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="6,12" hidden>
-    <label asp-for="TimeLimitSeconds" class="form-label"></label>
-    <input asp-for="TimeLimitSeconds" class="form-control" type="number" min="1" max="600" />
-    <span asp-validation-for="TimeLimitSeconds" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-recording question-authoring-type-fields" data-question-types="3,4,6,10" hidden="@(!SupportsType("3,4,6,10"))" disabled="@(!SupportsType("3,4,6,10"))">
+    <legend class="visually-hidden">Learner voice recording</legend>
+    <span class="question-authoring-recording-icon" aria-hidden="true">🎙</span>
+    <div><h3>Learner voice recording</h3><div class="form-check"><input asp-for="AllowsAudioRecording" class="form-check-input" /><label asp-for="AllowsAudioRecording" class="form-check-label"></label></div><p class="form-text mb-0">When enabled, learners may choose to record a response. Recordings are private and require the learner's consent.</p></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="12" hidden>
-    <label asp-for="TimedMatchingReferenceMappingText" class="form-label"></label>
-    <textarea asp-for="TimedMatchingReferenceMappingText" class="form-control" rows="5" aria-describedby="timed-matching-mapping-help"></textarea>
-    <div id="timed-matching-mapping-help" class="form-text">Use original, familiar symbols only. Enter one required pair per line, for example A = ●. The learner sees this reference mapping before matching one item at a time.</div>
-    <span asp-validation-for="TimedMatchingReferenceMappingText" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="6,12" hidden="@(!SupportsType("6,12"))" disabled="@(!SupportsType("6,12"))">
+    <legend class="visually-hidden">Time limit</legend>
+    <div class="question-authoring-field question-authoring-field-compact"><label asp-for="TimeLimitSeconds" class="form-label"></label><input asp-for="TimeLimitSeconds" class="form-control" type="number" min="1" max="600" /><span asp-validation-for="TimeLimitSeconds" class="text-danger small"></span></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="12" hidden>
-    <label asp-for="TimedMatchingItemsText" class="form-label"></label>
-    <textarea asp-for="TimedMatchingItemsText" class="form-control" rows="5" aria-describedby="timed-matching-items-help"></textarea>
-    <div id="timed-matching-items-help" class="form-text">List the item labels to show, one per line. Leave blank to use each reference item once.</div>
-    <span asp-validation-for="TimedMatchingItemsText" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="12" hidden="@(!SupportsType("12"))" disabled="@(!SupportsType("12"))">
+    <legend class="visually-hidden">Timed matching configuration</legend>
+    <div class="question-authoring-field"><label asp-for="TimedMatchingReferenceMappingText" class="form-label"></label><textarea asp-for="TimedMatchingReferenceMappingText" class="form-control" rows="5"></textarea><div class="form-text">Use one item and symbol per line, separated by =. Keep symbols familiar and original.</div><span asp-validation-for="TimedMatchingReferenceMappingText" class="text-danger small"></span></div>
+    <div class="question-authoring-field"><label asp-for="TimedMatchingItemsText" class="form-label"></label><textarea asp-for="TimedMatchingItemsText" class="form-control" rows="4"></textarea><div class="form-text">Optional. Enter one item label per line.</div><span asp-validation-for="TimedMatchingItemsText" class="text-danger small"></span></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="11" hidden>
-    <label asp-for="WorkingMemorySequenceText" class="form-label"></label>
-    <textarea asp-for="WorkingMemorySequenceText" class="form-control" rows="5" aria-describedby="working-memory-sequence-help"></textarea>
-    <div id="working-memory-sequence-help" class="form-text">Use original/demo items only. The learner will see these briefly and then type the sequence from memory.</div>
-    <span asp-validation-for="WorkingMemorySequenceText" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="11" hidden="@(!SupportsType("11"))" disabled="@(!SupportsType("11"))">
+    <legend class="visually-hidden">Working memory configuration</legend>
+    <div class="question-authoring-field"><label asp-for="WorkingMemorySequenceText" class="form-label"></label><textarea asp-for="WorkingMemorySequenceText" class="form-control" rows="5"></textarea><div class="form-text">Use original or demonstration items only. Enter one item per line.</div><span asp-validation-for="WorkingMemorySequenceText" class="text-danger small"></span></div>
+    <div class="question-authoring-field question-authoring-field-compact"><label asp-for="MemoryDisplayDurationMilliseconds" class="form-label"></label><input asp-for="MemoryDisplayDurationMilliseconds" class="form-control" type="number" min="1000" max="30000" /><span asp-validation-for="MemoryDisplayDurationMilliseconds" class="text-danger small"></span></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="11" hidden>
-    <label asp-for="MemoryDisplayDurationMilliseconds" class="form-label"></label>
-    <input asp-for="MemoryDisplayDurationMilliseconds" class="form-control" type="number" min="1000" max="30000" />
-    <div class="form-text">This is activity timing only; it is not a diagnostic threshold.</div>
-    <span asp-validation-for="MemoryDisplayDurationMilliseconds" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="13" hidden="@(!SupportsType("13"))" disabled="@(!SupportsType("13"))">
+    <legend class="visually-hidden">Pattern reasoning configuration</legend>
+    <div class="question-authoring-field question-authoring-field-compact"><label asp-for="PatternDifficultyLevel" class="form-label"></label><input asp-for="PatternDifficultyLevel" class="form-control" type="number" min="1" max="5" /><div class="form-text">Planning metadata only; it is not a diagnostic or intelligence score.</div><span asp-validation-for="PatternDifficultyLevel" class="text-danger small"></span></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="13" hidden>
-    <label asp-for="PatternDifficultyLevel" class="form-label"></label>
-    <input asp-for="PatternDifficultyLevel" class="form-control" type="number" min="1" max="5" />
-    <div class="form-text">Optional planning metadata for original activities only. It is not an intelligence or diagnostic score.</div>
-    <span asp-validation-for="PatternDifficultyLevel" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="6" hidden="@(!SupportsType("6"))" disabled="@(!SupportsType("6"))">
+    <legend class="visually-hidden">Timed naming items</legend>
+    <div class="question-authoring-field"><label asp-for="TimedNamingItemsText" class="form-label"></label><textarea asp-for="TimedNamingItemsText" class="form-control" rows="7"></textarea><div class="form-text">Enter exactly 20 symbols, letters, numbers, or familiar words. Use original items, one per line.</div><span asp-validation-for="TimedNamingItemsText" class="text-danger small"></span></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="6" hidden>
-    <label asp-for="TimedNamingItemsText" class="form-label"></label>
-    <textarea asp-for="TimedNamingItemsText" class="form-control" rows="8" aria-describedby="timed-naming-items-help"></textarea>
-    <div id="timed-naming-items-help" class="form-text">Enter exactly 20 symbols, letters, numbers, or familiar words. Repeats are allowed; one item per line.</div>
-    <span asp-validation-for="TimedNamingItemsText" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="8,10" hidden="@(!SupportsType("8,10"))" disabled="@(!SupportsType("8,10"))">
+    <legend class="visually-hidden">Reading passage</legend>
+    <div class="question-authoring-field"><label asp-for="PassageText" class="form-label"></label><textarea asp-for="PassageText" class="form-control" rows="8"></textarea><div class="form-text">Enter an original passage. Reading fluency uses this text in its timed learner activity.</div><span asp-validation-for="PassageText" class="text-danger small"></span></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="8,10" hidden>
-    <label asp-for="PassageText" class="form-label"></label>
-    <textarea asp-for="PassageText" class="form-control" rows="8" aria-describedby="passage-text-help"></textarea>
-    <div id="passage-text-help" class="form-text">Enter the passage and one related question. For more questions on this passage, add more Reading comprehension questions with the same passage under this screening test. Reading fluency uses its own timed activity.</div>
-    <span asp-validation-for="PassageText" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="10" hidden="@(!SupportsType("10"))" disabled="@(!SupportsType("10"))">
+    <legend class="visually-hidden">Reading fluency planning</legend>
+    <div class="question-authoring-grid-two">
+        <div class="question-authoring-field"><label asp-for="ReferenceWordCount" class="form-label"></label><input asp-for="ReferenceWordCount" class="form-control" type="number" min="1" max="10000" /><span asp-validation-for="ReferenceWordCount" class="text-danger small"></span></div>
+        <div class="question-authoring-field"><label asp-for="TargetWordsPerMinute" class="form-label"></label><input asp-for="TargetWordsPerMinute" class="form-control" type="number" min="1" max="1000" /><div class="form-text">Optional planning metadata, not a diagnostic threshold.</div><span asp-validation-for="TargetWordsPerMinute" class="text-danger small"></span></div>
+    </div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="10" hidden>
-    <label asp-for="ReferenceWordCount" class="form-label"></label>
-    <input asp-for="ReferenceWordCount" class="form-control" type="number" min="1" max="10000" />
-    <div class="form-text">Leave blank to estimate the passage word count from its text.</div>
-    <span asp-validation-for="ReferenceWordCount" aria-live="polite" class="text-danger small"></span>
-</div>
+<fieldset class="question-authoring-type-fields" data-question-types="3,4" hidden="@(!SupportsType("3,4"))" disabled="@(!SupportsType("3,4"))">
+    <legend class="visually-hidden">Reading audio sample</legend>
+    <div class="question-authoring-field"><label asp-for="AudioPath" class="form-label"></label><input asp-for="AudioPath" class="form-control" /><div class="form-text">Optional existing supported audio file name. File upload is not available here.</div><span asp-validation-for="AudioPath" class="text-danger small"></span></div>
+</fieldset>
 
-<div class="mb-3 question-type-fields" data-question-types="10" hidden>
-    <label asp-for="TargetWordsPerMinute" class="form-label"></label>
-    <input asp-for="TargetWordsPerMinute" class="form-control" type="number" min="1" max="1000" aria-describedby="target-pace-help" />
-    <div id="target-pace-help" class="form-text">Optional planning metadata only; this is not a diagnostic threshold.</div>
-    <span asp-validation-for="TargetWordsPerMinute" aria-live="polite" class="text-danger small"></span>
-</div>
-
-<div class="mb-3 question-type-fields" data-question-types="9" hidden>
-    <label asp-for="MaxAudioReplays" class="form-label"></label>
-    <input asp-for="MaxAudioReplays" class="form-control" type="number" min="0" max="20" />
-    <div class="form-text">Leave blank for unlimited replay, the learner-friendly default. This is the number of extra listens after the first play.</div>
-    <span asp-validation-for="MaxAudioReplays" aria-live="polite" class="text-danger small"></span>
-</div>
-
-<div class="mb-3 question-type-fields" data-question-types="3,4,9" hidden>
-    <label asp-for="AudioPath" class="form-label"></label>
-    <input asp-for="AudioPath" class="form-control" aria-describedby="audio-path-help" />
-    <div id="audio-path-help" class="form-text">For Listening comprehension, place the audio file in App_Data/ScreeningAudio and enter its file name. Supported formats: MP3, WAV, OGG, M4A, AAC, and WebM. Folder paths and external URLs are not allowed.</div>
-    <span asp-validation-for="AudioPath" aria-live="polite" class="text-danger small"></span>
-</div>
-
-<div class="mb-3 question-type-fields" data-question-types="1,5,6,13" hidden>
-    <label asp-for="ImagePath" class="form-label"></label>
-    <input asp-for="ImagePath" class="form-control" aria-describedby="image-path-help" />
-    <div id="image-path-help" class="form-text">Enter an existing application path or URL. File upload is not available here.</div>
-    <span asp-validation-for="ImagePath" aria-live="polite" class="text-danger small"></span>
-</div>
-
+<fieldset class="question-authoring-type-fields" data-question-types="1,5,6,13" hidden="@(!SupportsType("1,5,6,13"))" disabled="@(!SupportsType("1,5,6,13"))">
+    <legend class="visually-hidden">Question image</legend>
+    <div class="question-authoring-field"><label asp-for="ImagePath" class="form-label"></label><input asp-for="ImagePath" class="form-control" placeholder="/images/question.png or https://..." /><div class="form-text">Enter an existing application path or URL. Image upload is not available here.</div><span asp-validation-for="ImagePath" class="text-danger small"></span></div>
+</fieldset>

@@ -241,6 +241,42 @@ namespace LexiAssist.Web.Data.Migrations
                     b.ToTable("PracticeStories");
                 });
 
+            modelBuilder.Entity("LexiAssist.Web.Models.Screening.AssessmentDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCsvImport")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDiscarded")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ScreeningTestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScreeningTestId", "IsDiscarded");
+
+                    b.ToTable("AssessmentDrafts");
+                });
+
             modelBuilder.Entity("LexiAssist.Web.Models.Audit.AuditEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -1422,6 +1458,17 @@ namespace LexiAssist.Web.Data.Migrations
                     b.Navigation("CurrentTest");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("LexiAssist.Web.Models.Screening.AssessmentDraft", b =>
+                {
+                    b.HasOne("LexiAssist.Web.Models.Screening.ScreeningTest", "ScreeningTest")
+                        .WithMany()
+                        .HasForeignKey("ScreeningTestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ScreeningTest");
                 });
 
             modelBuilder.Entity("LexiAssist.Web.Models.Screening.ScreeningQuestion", b =>

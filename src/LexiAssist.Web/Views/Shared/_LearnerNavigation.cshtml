@@ -1,0 +1,52 @@
+@{
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var action = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    var dashboardActive = string.Equals(controller, "Dashboard", StringComparison.OrdinalIgnoreCase);
+    var screeningActive = string.Equals(controller, "Screening", StringComparison.OrdinalIgnoreCase);
+    var practiceActive = string.Equals(controller, "Activities", StringComparison.OrdinalIgnoreCase);
+    var progressActive = string.Equals(controller, "Progress", StringComparison.OrdinalIgnoreCase);
+    var resourcesActive = string.Equals(controller, "EducationalResources", StringComparison.OrdinalIgnoreCase);
+    var settingsActive = string.Equals(controller, "Settings", StringComparison.OrdinalIgnoreCase);
+    var privacyActive = string.Equals(controller, "Home", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(action, "Privacy", StringComparison.OrdinalIgnoreCase);
+}
+
+<ul class="navbar-nav learner-nav-links me-lg-auto align-items-lg-center gap-lg-1">
+    <li class="nav-item"><a class="nav-link learner-nav-link" asp-controller="Home" asp-action="Index">Home</a></li>
+    <li class="nav-item"><a class="nav-link learner-nav-link @(dashboardActive ? "is-active" : string.Empty)" asp-controller="Dashboard" asp-action="Learner" aria-current="@(dashboardActive ? "page" : null)">Dashboard</a></li>
+    <li class="nav-item"><a class="nav-link learner-nav-link @(screeningActive ? "is-active" : string.Empty)" asp-controller="Screening" asp-action="Index" aria-current="@(screeningActive ? "page" : null)">Screening</a></li>
+    <li class="nav-item"><a class="nav-link learner-nav-link @(practiceActive ? "is-active" : string.Empty)" asp-controller="Activities" asp-action="Index" aria-current="@(practiceActive ? "page" : null)">Practice</a></li>
+    <li class="nav-item">
+        @if (dashboardActive)
+        {
+            <a class="nav-link learner-nav-link" href="/Dashboard/Learner#progress">Progress</a>
+        }
+        else
+        {
+            <a class="nav-link learner-nav-link @(progressActive ? "is-active" : string.Empty)" asp-controller="Progress" asp-action="Index" aria-current="@(progressActive ? "page" : null)">Progress</a>
+        }
+    </li>
+    <li class="nav-item">
+        @if (dashboardActive)
+        {
+            <a class="nav-link learner-nav-link" href="/Dashboard/Learner#resources">Resources</a>
+        }
+        else
+        {
+            <a class="nav-link learner-nav-link @(resourcesActive ? "is-active" : string.Empty)" asp-controller="EducationalResources" asp-action="Index" aria-current="@(resourcesActive ? "page" : null)">Resources</a>
+        }
+    </li>
+    <li class="nav-item"><a class="nav-link learner-nav-link @(settingsActive ? "is-active" : string.Empty)" asp-controller="Settings" asp-action="Accessibility" aria-current="@(settingsActive ? "page" : null)">Settings</a></li>
+    <li class="nav-item"><a class="nav-link learner-nav-link @(privacyActive ? "is-active" : string.Empty)" asp-controller="Home" asp-action="Privacy" aria-current="@(privacyActive ? "page" : null)">Privacy</a></li>
+</ul>
+
+<ul class="navbar-nav learner-account-nav align-items-lg-center gap-lg-1">
+    @await Component.InvokeAsync("NotificationBell")
+    <li class="nav-item"><span class="nav-link learner-account-name">Hello @User.Identity?.Name!</span></li>
+    <li class="nav-item">
+        <form class="d-inline" asp-controller="Account" asp-action="Logout" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="nav-link btn btn-link learner-signout">Sign out</button>
+        </form>
+    </li>
+</ul>

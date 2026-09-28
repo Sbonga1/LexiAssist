@@ -1,0 +1,38 @@
+@model LexiAssist.Web.ViewModels.AssessmentBuilder.AssessmentPreviewViewModel
+@{
+    ViewData["Title"] = "Candidate preview";
+}
+
+<section class="assessment-candidate-preview" aria-labelledby="assessment-preview-heading">
+    <header class="assessment-candidate-preview-heading">
+        <div>
+            <p class="auth-eyebrow">Read-only candidate preview</p>
+            <h1 id="assessment-preview-heading">@Model.Name</h1>
+            <p>@Model.Description</p>
+        </div>
+        <a href="@(Model.ReturnUrl ?? Url.Action("Index", new { testId = Model.ScreeningTestId }))" class="assessment-builder-button assessment-builder-button-secondary">@Model.ReturnLabel</a>
+    </header>
+    @if (!string.IsNullOrWhiteSpace(Model.Instructions))
+    {
+        <section class="assessment-candidate-instructions" aria-labelledby="candidate-instructions-heading">
+            <h2 id="candidate-instructions-heading">Instructions</h2>
+            <p>@Model.Instructions</p>
+        </section>
+    }
+    <p class="assessment-candidate-preview-note">This preview does not record answers or create an attempt.</p>
+    @if (Model.Questions.Count == 0)
+    {
+        <div class="assessment-builder-empty"><h2>No active questions to preview</h2><p>Activate questions in the builder to include them in this preview.</p></div>
+    }
+    else
+    {
+        <ol class="assessment-candidate-question-list">
+            @foreach (var question in Model.Questions)
+            {
+                <li>
+                    <partial name="~/Views/AdminAssessmentBuilder/_CandidateQuestion.cshtml" model="question" />
+                </li>
+            }
+        </ol>
+    }
+</section>

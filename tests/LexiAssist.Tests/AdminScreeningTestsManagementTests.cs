@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using LexiAssist.Web.Data;
 using LexiAssist.Web.Models.Identity;
@@ -78,7 +79,7 @@ public sealed class AdminScreeningTestsManagementTests
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var screeningTest = await dbContext.ScreeningTests.SingleAsync(test => test.Slug == "demo-category");
             testId = screeningTest.Id;
-            Assert.True(screeningTest.IsActive);
+            Assert.False(screeningTest.IsActive);
         }
 
         var detailsUrl = $"/admin/screening-tests/{testId}";
@@ -138,16 +139,40 @@ public sealed class AdminScreeningTestsManagementTests
             Assert.False((await dbContext.ScreeningTests.SingleAsync(test => test.Id == testId)).IsActive);
         }
 
+        using var missingTokenForm = new FormUrlEncodedContent(new Dictionary<string, string>());
+        var missingTokenActivation = await client.PostAsync($"{detailsUrl}/activate", missingTokenForm);
+        Assert.Equal(HttpStatusCode.BadRequest, missingTokenActivation.StatusCode);
+
         token = ExtractAntiForgeryToken(await (await client.GetAsync(detailsUrl)).Content.ReadAsStringAsync());
-        var activateResult = await client.PostAsync($"{detailsUrl}/activate", BuildActionForm(token));
-        Assert.Equal(HttpStatusCode.Redirect, activateResult.StatusCode);
+        var blockedActivation = await client.PostAsync($"{detailsUrl}/activate", BuildActionForm(token));
+        Assert.Equal(HttpStatusCode.Redirect, blockedActivation.StatusCode);
+        var blockedDetails = await client.GetAsync(detailsUrl);
+        Assert.Contains("Add and activate at least one question before publishing this assessment.", await blockedDetails.Content.ReadAsStringAsync());
 
         using (var scope = factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            Assert.True((await dbContext.ScreeningTests.SingleAsync(test => test.Id == testId)).IsActive);
-            Assert.Empty(await dbContext.ScreeningQuestions.Where(question => question.ScreeningTestId == testId).ToListAsync());
+            Assert.False((await dbContext.ScreeningTests.SingleAsync(test => test.Id == testId)).IsActive);
+            dbContext.ScreeningQuestions.Add(new ScreeningQuestion
+            {
+                ScreeningTestId = testId,
+                Prompt = "Choose the correct answer.",
+                QuestionType = ScreeningQuestionType.MultipleChoice,
+                CorrectAnswer = "yes",
+                MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { ChoiceOptions = ["yes", "no"] }),
+                SortOrder = 1,
+                IsActive = true
+            });
+            await dbContext.SaveChangesAsync();
         }
+
+        token = ExtractAntiForgeryToken(await (await client.GetAsync(detailsUrl)).Content.ReadAsStringAsync());
+        var activateResult = await client.PostAsync($"{detailsUrl}/activate", BuildActionForm(token));
+        Assert.Equal(HttpStatusCode.Redirect, activateResult.StatusCode);
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDbContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True((await verifyDbContext.ScreeningTests.SingleAsync(test => test.Id == testId)).IsActive);
+        Assert.Equal(1, await verifyDbContext.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId && question.IsActive));
     }
 
     [Fact]
@@ -263,7 +288,7 @@ public sealed class AdminScreeningTestsManagementTests
     }
 
     [Fact]
-    public async Task Optional_memory_category_stays_inactive_until_an_administrator_activates_it()
+    public async Task Optional_memory_category_stays_inactive_until_it_has_an_active_question()
     {
         using var factory = new LexiAssistWebApplicationFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -287,11 +312,13 @@ public sealed class AdminScreeningTestsManagementTests
         var activateToken = ExtractAntiForgeryToken(detailsHtml);
         var activateResponse = await client.PostAsync($"{detailsUrl}/activate", BuildActionForm(activateToken));
         Assert.Equal(HttpStatusCode.Redirect, activateResponse.StatusCode);
+        var blockedDetails = await client.GetAsync(detailsUrl);
+        Assert.Contains("Add and activate at least one question before publishing this assessment.", await blockedDetails.Content.ReadAsStringAsync());
 
         using (var scope = factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            Assert.True((await dbContext.ScreeningTests.SingleAsync(test => test.Id == optionalCategoryId)).IsActive);
+            Assert.False((await dbContext.ScreeningTests.SingleAsync(test => test.Id == optionalCategoryId)).IsActive);
         }
     }
 

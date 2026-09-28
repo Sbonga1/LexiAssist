@@ -3,76 +3,129 @@
     ViewData["Title"] = "Create user";
 }
 
-<div class="admin-form-card">
-    <p class="auth-eyebrow">Administration</p>
-    <h1 class="h2">Create user account</h1>
-    <p class="text-secondary">Choose Learner or Psychologist. Administrator accounts cannot be created from this form.</p>
+<section class="admin-user-create-page" aria-labelledby="admin-user-create-title">
+    <header class="admin-user-create-heading">
+        <p class="auth-eyebrow">Administration</p>
+        <h1 id="admin-user-create-title">Create user account</h1>
+        <p>Choose Learner or Psychologist. Administrator accounts cannot be created from this form.</p>
+    </header>
 
-    <form asp-action="Create" method="post" class="auth-form">
-        @Html.AntiForgeryToken()
-        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
-
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label asp-for="FirstName" class="form-label"></label>
-                <input asp-for="FirstName" class="form-control" autocomplete="given-name" autofocus />
-                <span asp-validation-for="FirstName" aria-live="polite" class="text-danger small"></span>
+    <section class="admin-user-create-card" aria-labelledby="admin-user-create-details-title">
+        <header class="admin-user-create-card-header">
+            <span class="admin-user-create-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M15.5 19.5v-1.2a4.3 4.3 0 0 0-4.3-4.3H6.7a4.3 4.3 0 0 0-4.3 4.3v1.2" />
+                    <circle cx="9" cy="6.8" r="3.6" />
+                    <path d="M18 7v6m-3-3h6" />
+                </svg>
+            </span>
+            <div>
+                <h2 id="admin-user-create-details-title">User details</h2>
+                <p>Enter the user's information and account type. A secure password is required.</p>
             </div>
-            <div class="col-md-6 mb-3">
-                <label asp-for="LastName" class="form-label"></label>
-                <input asp-for="LastName" class="form-control" autocomplete="family-name" />
-                <span asp-validation-for="LastName" aria-live="polite" class="text-danger small"></span>
-            </div>
-        </div>
+        </header>
 
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label asp-for="PreferredName" class="form-label"></label>
-                <input asp-for="PreferredName" class="form-control" autocomplete="nickname" />
-                <span asp-validation-for="PreferredName" aria-live="polite" class="text-danger small"></span>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label asp-for="DateOfBirth" class="form-label"></label>
-                <input asp-for="DateOfBirth" class="form-control" max="@DateTime.UtcNow.ToString("yyyy-MM-dd")" />
-                <span asp-validation-for="DateOfBirth" aria-live="polite" class="text-danger small"></span>
-            </div>
-        </div>
+        <form asp-action="Create" method="post" class="admin-user-create-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="admin-user-create-validation-summary alert alert-danger" role="alert"></div>
 
-        <div class="mb-3">
-            <label asp-for="Email" class="form-label"></label>
-            <input asp-for="Email" class="form-control" autocomplete="email" />
-            <span asp-validation-for="Email" aria-live="polite" class="text-danger small"></span>
-        </div>
-
-        <div class="mb-3">
-            <label asp-for="Role" class="form-label"></label>
-            <select asp-for="Role" asp-items="Html.GetEnumSelectList<LexiAssist.Web.ViewModels.AdminUsers.ManagedUserRole>()" class="form-select">
-                <option value="">Choose an account type</option>
-            </select>
-            <span asp-validation-for="Role" aria-live="polite" class="text-danger small"></span>
-        </div>
-
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label asp-for="Password" class="form-label"></label>
-                <input asp-for="Password" class="form-control" autocomplete="new-password" />
-                <span asp-validation-for="Password" aria-live="polite" class="text-danger small"></span>
+            <div class="admin-user-create-field">
+                <label asp-for="FirstName" class="form-label">First name</label>
+                <input asp-for="FirstName" class="form-control" autocomplete="given-name" placeholder="Enter first name" autofocus aria-required="true" aria-invalid="@(ViewData.ModelState[nameof(Model.FirstName)]?.Errors.Count > 0 ? "true" : null)" aria-describedby="FirstName-error" />
+                <span asp-validation-for="FirstName" id="FirstName-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
             </div>
-            <div class="col-md-6 mb-3">
-                <label asp-for="ConfirmPassword" class="form-label"></label>
-                <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
-                <span asp-validation-for="ConfirmPassword" aria-live="polite" class="text-danger small"></span>
-            </div>
-        </div>
 
-        <div class="d-flex flex-wrap gap-2 mt-2">
-            <button type="submit" class="btn btn-primary">Create account</button>
-            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
-        </div>
-    </form>
-</div>
+            <div class="admin-user-create-field">
+                <label asp-for="LastName" class="form-label">Last name</label>
+                <input asp-for="LastName" class="form-control" autocomplete="family-name" placeholder="Enter last name" aria-required="true" aria-invalid="@(ViewData.ModelState[nameof(Model.LastName)]?.Errors.Count > 0 ? "true" : null)" aria-describedby="LastName-error" />
+                <span asp-validation-for="LastName" id="LastName-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
+            </div>
+
+            <div class="admin-user-create-field">
+                <label asp-for="PreferredName" class="form-label">Preferred name <span class="admin-user-create-optional">(optional)</span></label>
+                <input asp-for="PreferredName" class="form-control" autocomplete="nickname" placeholder="Enter preferred name" aria-describedby="PreferredName-error" />
+                <span asp-validation-for="PreferredName" id="PreferredName-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
+            </div>
+
+            <div class="admin-user-create-field">
+                <label asp-for="DateOfBirth" class="form-label">Date of birth <span class="admin-user-create-optional">(optional)</span></label>
+                <input asp-for="DateOfBirth" class="form-control" max="@DateTime.UtcNow.ToString("yyyy-MM-dd")" aria-describedby="DateOfBirth-error" />
+                <span asp-validation-for="DateOfBirth" id="DateOfBirth-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
+            </div>
+
+            <div class="admin-user-create-field admin-user-create-field-wide">
+                <label asp-for="Email" class="form-label">Email address</label>
+                <input asp-for="Email" class="form-control" autocomplete="email" placeholder="Enter email address" aria-required="true" aria-invalid="@(ViewData.ModelState[nameof(Model.Email)]?.Errors.Count > 0 ? "true" : null)" aria-describedby="Email-error" />
+                <span asp-validation-for="Email" id="Email-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
+            </div>
+
+            <div class="admin-user-create-field admin-user-create-field-wide">
+                <label asp-for="Role" class="form-label">Account type</label>
+                <select asp-for="Role" asp-items="Html.GetEnumSelectList<LexiAssist.Web.ViewModels.AdminUsers.ManagedUserRole>()" class="form-select" aria-required="true" aria-invalid="@(ViewData.ModelState[nameof(Model.Role)]?.Errors.Count > 0 ? "true" : null)" aria-describedby="Role-error">
+                    <option value="">Choose an account type</option>
+                </select>
+                <span asp-validation-for="Role" id="Role-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
+            </div>
+
+            <div class="admin-user-create-field">
+                <label asp-for="Password" class="form-label">Password</label>
+                <div class="admin-user-create-password-control">
+                    <input asp-for="Password" class="form-control" autocomplete="new-password" placeholder="Enter password" aria-required="true" aria-invalid="@(ViewData.ModelState[nameof(Model.Password)]?.Errors.Count > 0 ? "true" : null)" aria-describedby="Password-error" />
+                    <button type="button" class="admin-user-create-password-toggle" data-password-toggle aria-label="Show password" aria-controls="Password" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M2.2 12s3.5-6.2 9.8-6.2 9.8 6.2 9.8 6.2-3.5 6.2-9.8 6.2S2.2 12 2.2 12Z" />
+                            <circle cx="12" cy="12" r="3" />
+                            <path class="admin-user-create-eye-slash" d="m4 4 16 16" />
+                        </svg>
+                    </button>
+                </div>
+                <span asp-validation-for="Password" id="Password-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
+            </div>
+
+            <div class="admin-user-create-field">
+                <label asp-for="ConfirmPassword" class="form-label">Confirm password</label>
+                <div class="admin-user-create-password-control">
+                    <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" placeholder="Confirm password" aria-required="true" aria-invalid="@(ViewData.ModelState[nameof(Model.ConfirmPassword)]?.Errors.Count > 0 ? "true" : null)" aria-describedby="ConfirmPassword-error" />
+                    <button type="button" class="admin-user-create-password-toggle" data-password-toggle aria-label="Show password" aria-controls="ConfirmPassword" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M2.2 12s3.5-6.2 9.8-6.2 9.8 6.2 9.8 6.2-3.5 6.2-9.8 6.2S2.2 12 2.2 12Z" />
+                            <circle cx="12" cy="12" r="3" />
+                            <path class="admin-user-create-eye-slash" d="m4 4 16 16" />
+                        </svg>
+                    </button>
+                </div>
+                <span asp-validation-for="ConfirmPassword" id="ConfirmPassword-error" aria-live="polite" class="admin-user-create-error text-danger small"></span>
+            </div>
+
+            <div class="admin-user-create-actions">
+                <button type="submit" class="btn btn-primary admin-user-create-submit">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M15.5 19.5v-1.2a4.3 4.3 0 0 0-4.3-4.3H6.7a4.3 4.3 0 0 0-4.3 4.3v1.2" />
+                        <circle cx="9" cy="6.8" r="3.6" />
+                        <path d="M18 7v6m-3-3h6" />
+                    </svg>
+                    <span>Create account</span>
+                </button>
+                <a asp-action="Index" class="btn btn-outline-secondary admin-user-create-cancel">Cancel</a>
+            </div>
+        </form>
+    </section>
+</section>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-}
+    <script>
+        document.querySelectorAll("[data-password-toggle]").forEach((toggle) => {
+            toggle.addEventListener("click", () => {
+                const input = document.getElementById(toggle.getAttribute("aria-controls"));
+                if (!input) return;
 
+                const isVisible = input.type === "text";
+                input.type = isVisible ? "password" : "text";
+                toggle.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
+                toggle.setAttribute("aria-pressed", String(!isVisible));
+                toggle.closest(".admin-user-create-password-control")?.classList.toggle("is-visible", !isVisible);
+            });
+        });
+    </script>
+}

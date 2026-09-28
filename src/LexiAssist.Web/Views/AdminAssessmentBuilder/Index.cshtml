@@ -1,0 +1,252 @@
+@model LexiAssist.Web.ViewModels.AssessmentBuilder.AssessmentBuilderViewModel
+@{
+    ViewData["Title"] = "Assessment builder";
+    ViewData["AssessmentWorkspace"] = true;
+}
+
+<section class="assessment-builder-page" data-assessment-builder-root aria-labelledby="assessment-builder-heading">
+    <header class="assessment-builder-workflow">
+        <a asp-controller="AdminScreeningTests" asp-action="Index" class="assessment-builder-back">← <span>Back to screening tests</span></a>
+        <partial name="_BuildSteps" model="Model.ScreeningTestId" />
+        <div class="assessment-builder-top-actions">
+        <button type="button" class="assessment-builder-button" data-focus-mode aria-pressed="false">Focus mode</button>
+
+            <a asp-action="Preview" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-button assessment-builder-button-secondary">Candidate preview</a>
+            @if (Model.IsActive)
+            {
+                <form asp-action="Deactivate" asp-route-testId="@Model.ScreeningTestId" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="assessment-builder-button assessment-builder-button-danger">Deactivate</button>
+                </form>
+            }
+            else
+            {
+                <form asp-action="Activate" asp-route-testId="@Model.ScreeningTestId" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="assessment-builder-button assessment-builder-button-primary">Publish / Activate</button>
+                </form>
+            }
+        </div>
+    </header>
+
+    @if (TempData["StatusMessage"] is string statusMessage)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-warning" role="alert">@errorMessage</div>
+    }
+    @if (TempData["ClientConsoleError"] is string clientConsoleError)
+    {
+        <div hidden data-builder-console-error>@clientConsoleError</div>
+    }
+    @if (Model.ImportMessage is not null)
+    {
+        <div class="alert alert-success" role="status">@Model.ImportMessage</div>
+    }
+    @if (Model.ResumableDraftId is Guid resumableDraftId)
+    {
+        <div class="alert alert-info assessment-draft-resume" role="status">
+            <span>@Model.ResumableDraftCount unadded review draft@(Model.ResumableDraftCount == 1 ? string.Empty : "s") are saved.</span>
+            <a asp-action="DraftReview" asp-route-testId="@Model.ScreeningTestId" asp-route-draftId="@resumableDraftId" class="assessment-builder-button">Resume draft review</a>
+        </div>
+    }
+    @if (Model.ImportErrors.Count > 0)
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>The CSV was not imported. Correct these issues and try again:</strong>
+            <ul class="mb-0 mt-2">
+                @foreach (var error in Model.ImportErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="alert alert-info" data-builder-feedback role="status" aria-live="polite" hidden></div>
+    <div id="assessment-generated-review-host" class="assessment-builder-generated-review-host" hidden></div>
+
+    <div class="assessment-workspace-content">
+    <div class="assessment-builder-title-row">
+        <div>
+            <p class="auth-eyebrow">Administration · Screening tests</p>
+            <h1 id="assessment-builder-heading">@Model.Name</h1>
+            <p class="assessment-builder-description">@Model.Description</p>
+        </div>
+        <span class="assessment-builder-status @(Model.IsActive ? "is-active" : "is-draft")">
+            <span aria-hidden="true"></span>@(Model.IsActive ? "Active" : "Draft · Inactive")
+        </span>
+    </div>
+
+    <div class="workspace-controls">
+        <button type="button" class="assessment-builder-button" data-toggle-panel="assessment-outline" aria-controls="assessment-outline" aria-expanded="false">Section navigator</button>
+        <span>@Model.QuestionCount @(Model.QuestionCount == 1 ? "question" : "questions") · @Model.ActiveQuestionCount active</span>
+    </div>
+    <div class="assessment-builder-layout">
+        <aside id="assessment-outline" class="assessment-builder-outline" aria-label="Assessment sections">
+            <h2>Sections</h2>
+            <a class="is-selected" href="#assessment-questions" aria-current="location">@Model.Name</a>
+            <p>@Model.QuestionCount @(Model.QuestionCount == 1 ? "question" : "questions") · @Model.ActiveQuestionCount active</p>
+            <a asp-action="Details" asp-route-testId="@Model.ScreeningTestId">Edit assessment details</a>
+        </aside>
+
+        <div class="assessment-builder-main">
+            <section class="assessment-builder-panel" id="assessment-section" aria-labelledby="assessment-section-heading">
+                <header class="assessment-builder-panel-heading">
+                    <div class="assessment-builder-panel-icon" aria-hidden="true">▤</div>
+                    <div>
+                        <h2 id="assessment-section-heading">Questions</h2>
+                        <p>@(string.IsNullOrWhiteSpace(Model.Instructions) ? "Questions in this existing screening test." : Model.Instructions)</p>
+                    </div>
+                    <span class="assessment-builder-question-count">@Model.QuestionCount @(Model.QuestionCount == 1 ? "question" : "questions")</span>
+                </header>
+
+                <div class="assessment-builder-section-actions">
+                    <a asp-controller="AdminScreeningQuestions" asp-action="Create" asp-route-testId="@Model.ScreeningTestId" asp-route-returnToBuilder="true" asp-route-returnPage="@Model.CurrentPage" class="assessment-builder-button assessment-builder-button-secondary">＋ Add question</a>
+                    <a asp-action="QuestionBank" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-button assessment-builder-button-secondary">Question bank</a>
+                    <button type="button" class="assessment-builder-button assessment-builder-button-primary" data-toggle-panel="assessment-ai" aria-controls="assessment-ai" aria-expanded="false">Generate with AI</button>
+                    <button type="button" class="assessment-builder-button" data-toggle-panel="assessment-import" aria-controls="assessment-import" aria-expanded="false">Import CSV</button>
+                </div>
+
+                <div class="assessment-builder-table-scroll" id="assessment-questions" tabindex="0" aria-label="Scrollable assessment questions">
+                    @if (Model.Questions.Count == 0)
+                    {
+                        <div class="assessment-builder-empty">
+                            <span aria-hidden="true">▤</span>
+                            <h3>No questions have been added yet</h3>
+                            <p>Create the first question, import a CSV, or copy an existing question from the bank.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <table class="assessment-builder-table">
+                            <caption class="visually-hidden">Questions in @Model.Name, ordered by their assessment sequence</caption>
+                            <thead>
+                                <tr><th scope="col">#</th><th scope="col">Question prompt</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var question in Model.Questions)
+                            {
+                                <tr>
+                                    <td>@question.SortOrder</td>
+                                    <td class="assessment-builder-prompt"><span class="workspace-prompt-excerpt">@question.Prompt</span></td>
+                                    <td><span class="assessment-builder-type">@question.QuestionTypeName</span></td>
+                                    <td><span class="assessment-builder-question-status @(question.IsActive ? "is-active" : "is-inactive")">@(question.IsActive ? "Active" : "Inactive")</span></td>
+                                    <td>
+                                        <div class="assessment-builder-row-actions">
+                                            <a asp-controller="AdminScreeningQuestions" asp-action="Edit" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" asp-route-returnToBuilder="true" asp-route-returnPage="@Model.CurrentPage" aria-label="Edit question @question.SortOrder">Edit</a>
+                                            <form asp-controller="AdminScreeningQuestions" asp-action="Move" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="direction" value="up" />
+                                                <input type="hidden" name="returnToBuilder" value="true" />
+                                                <input type="hidden" name="returnPage" value="@Model.CurrentPage" />
+                                                <button type="submit" aria-label="Move question @question.SortOrder up" disabled="@(question.SortOrder <= 1 ? "disabled" : null)">↑</button>
+                                            </form>
+                                            <form asp-controller="AdminScreeningQuestions" asp-action="Move" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="direction" value="down" />
+                                                <input type="hidden" name="returnToBuilder" value="true" />
+                                                <input type="hidden" name="returnPage" value="@Model.CurrentPage" />
+                                                <button type="submit" aria-label="Move question @question.SortOrder down" disabled="@(question.SortOrder >= Model.QuestionCount ? "disabled" : null)">↓</button>
+                                            </form>
+                                            @if (question.IsActive)
+                                            {
+                                                <form asp-controller="AdminScreeningQuestions" asp-action="Deactivate" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="returnToBuilder" value="true" />
+                                                    <input type="hidden" name="returnPage" value="@Model.CurrentPage" />
+                                                    <button type="submit">Deactivate</button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <form asp-controller="AdminScreeningQuestions" asp-action="Activate" asp-route-testId="@Model.ScreeningTestId" asp-route-questionId="@question.Id" method="post">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="returnToBuilder" value="true" />
+                                                    <input type="hidden" name="returnPage" value="@Model.CurrentPage" />
+                                                    <button type="submit">Activate</button>
+                                                </form>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+                @if (Model.TotalPages > 1)
+                {
+                    <nav class="assessment-builder-pagination" aria-label="Question pages">
+                        @if (Model.CurrentPage > 1)
+                        {
+                            <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" asp-route-page="@(Model.CurrentPage - 1)">Previous</a>
+                        }
+                        <span>Page @Model.CurrentPage of @Model.TotalPages</span>
+                        @if (Model.CurrentPage < Model.TotalPages)
+                        {
+                            <a asp-action="Index" asp-route-testId="@Model.ScreeningTestId" asp-route-page="@(Model.CurrentPage + 1)">Next</a>
+                        }
+                    </nav>
+                }
+            </section>
+            <p class="assessment-builder-preservation-note">Questions are deactivated instead of deleted so related records can be preserved.</p>
+        </div>
+
+        <aside class="assessment-builder-tools" aria-label="Question tools">
+            <section id="assessment-ai" class="assessment-builder-tool-card" aria-labelledby="assessment-generate-heading" hidden>
+                <button type="button" class="assessment-builder-button workspace-close" data-close-panel="assessment-ai">Close AI panel</button>
+                <h2 id="assessment-generate-heading">Generate draft questions</h2>
+                <p>Generate original question drafts from this assessment’s purpose. Review every question before adding it.</p>
+                @if (Model.OpenAiConfigured)
+                {
+                    <form asp-action="Generate" asp-route-testId="@Model.ScreeningTestId" method="post" class="assessment-builder-ai-form">
+                        @Html.AntiForgeryToken()
+                        <label for="QuestionCount">Question count</label>
+                        <select id="QuestionCount" name="QuestionCount">
+                            @for (var count = 1; count <= 20; count++)
+                            {
+                                <option value="@count" selected="@(count == 10)">@count</option>
+                            }
+                        </select>
+                        <label for="DifficultyMix">Difficulty mix</label>
+                        <select id="DifficultyMix" name="DifficultyMix">
+                            <option>Balanced</option>
+                            <option>Mostly accessible</option>
+                            <option>Progressive challenge</option>
+                        </select>
+                        <p class="assessment-builder-privacy-note">Submitting sends this assessment’s title, description, instructions, requested question count, selected difficulty mix, and existing question prompts to OpenAI. Do not include learner information in assessment details.</p>
+                        <button type="submit" class="assessment-builder-button assessment-builder-button-primary">✦ Generate draft questions</button>
+                    </form>
+                }
+                else
+                {
+                    <p class="assessment-builder-config-note" role="note">AI question generation is not configured. Set <code>OPENAI_API_KEY</code> for the application to enable it.</p>
+                }
+            </section>
+
+            <section id="assessment-import" class="assessment-builder-tool-card" aria-labelledby="assessment-import-heading" hidden>
+                <button type="button" class="assessment-builder-button workspace-close" data-close-panel="assessment-import">Close import panel</button>
+                <h2 id="assessment-import-heading">Import CSV</h2>
+                <p>All rows are checked before saving, and imported questions start inactive. If the column layout is unfamiliar, OpenAI can interpret it and show you a review step before anything is saved.</p>
+                <a asp-action="ImportTemplate" asp-route-testId="@Model.ScreeningTestId" class="assessment-builder-template-link">Download CSV template</a>
+                <form asp-action="Import" asp-route-testId="@Model.ScreeningTestId" method="post" enctype="multipart/form-data" class="assessment-builder-import-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="csvCompressed" value="false" />
+                    <label for="csvFile">Choose a CSV file (up to 8 MB)</label>
+                    <input id="csvFile" name="csvFile" type="file" accept=".csv,text/csv" />
+                    <small>Files over 256 KB are compressed in your browser when supported. Unfamiliar layouts may be sent to OpenAI for interpretation (up to 48,000 characters). Do not upload learner or other sensitive information. Review every interpreted question before importing. XLSX is not supported.</small>
+                    <button type="submit" class="assessment-builder-button assessment-builder-button-secondary">Import questions</button>
+                </form>
+            </section>
+
+        </aside>
+    </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/assessment-builder-actions.js" asp-append-version="true"></script>
+}
