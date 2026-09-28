@@ -793,13 +793,6 @@ body.learner-shell .learner-screening-heading h1 {
   overflow-wrap: anywhere;
 }
 
-body.learner-shell .learner-screening-exit {
-  flex: 0 0 auto;
-  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
-  color: var(--color-primary);
-  background: var(--color-surface);
-}
-
 body.learner-shell .learner-screening-runner > .screening-notice {
   display: flex;
   align-items: center;
@@ -1049,7 +1042,6 @@ body.learner-shell .learner-screening-runner :is(a, button, input, textarea, sel
 @media (max-width: 767.98px) {
   body.learner-shell .learner-screening-runner { padding-inline: .1rem; }
   body.learner-shell .learner-screening-heading { flex-direction: column; }
-  body.learner-shell .learner-screening-exit { width: 100%; }
   body.learner-shell .learner-screening-question { padding: 1rem; }
   body.learner-shell .learner-screening-question-meta { align-items: flex-start; }
 }

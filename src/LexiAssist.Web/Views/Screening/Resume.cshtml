@@ -10,14 +10,13 @@
             <h1 id="resume-screening-heading">@(string.IsNullOrWhiteSpace(Model.ScreeningTestName) ? "Resume screening" : Model.ScreeningTestName)</h1>
             @if (!Model.IsUnavailable)
             {
-                <p class="learner-dashboard-intro">Question @Model.QuestionNumber of @Model.TotalQuestionCount <span aria-hidden="true">·</span> Your progress is saved as you continue.</p>
+                <p class="learner-dashboard-intro">Complete one question at a time. Your response is saved when you continue.</p>
             }
             else
             {
                 <p class="learner-dashboard-intro">Your in-progress screening was started @(Model.AttemptStartedAtUtc.ToString("u")).</p>
             }
         </div>
-        <a asp-action="Index" class="btn btn-outline-secondary learner-screening-exit">Pause and return later</a>
     </header>
 
     <partial name="_ScreeningNotice" />
@@ -50,7 +49,7 @@
 
         <section class="admin-details-card screening-question learner-screening-question" aria-labelledby="question-heading">
             <header class="learner-screening-question-meta">
-                <p class="auth-eyebrow">Question @Model.QuestionNumber</p>
+                <p class="auth-eyebrow">Assessment question</p>
                 @if (!string.IsNullOrWhiteSpace(Model.QuestionTypeName))
                 {
                     <span class="learner-screening-type-badge">@Model.QuestionTypeName</span>

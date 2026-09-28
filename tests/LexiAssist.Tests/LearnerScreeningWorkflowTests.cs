@@ -133,8 +133,8 @@ public sealed class LearnerScreeningWorkflowTests
         Assert.Contains("Question 1 of 1", resumeHtml);
         Assert.Contains("Assessment in progress", resumeHtml);
         Assert.Contains("class=\"learner-screening-type-badge\">Word reading</span>", resumeHtml);
+        Assert.Contains("Your response is saved when you continue", resumeHtml);
         Assert.Contains("100%", resumeHtml);
-        Assert.Contains("Pause and return later", resumeHtml);
         Assert.Contains("Word Reading", resumeHtml);
         Assert.Contains("data-learner-audio-recorder", resumeHtml);
         Assert.DoesNotContain("Live transcription", resumeHtml);
