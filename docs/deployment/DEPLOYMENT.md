@@ -1,11 +1,11 @@
 # LexiAssist deployment guide
 
-This guide prepares the accepted LexiAssist application for a hosting-platform-neutral deployment. It does not assume IIS, Nginx, Docker, Kubernetes, a cloud provider, or a particular operating system.
+This guide describes the hosting-platform-neutral requirements. For the Azure App Service and Azure SQL configuration, use [AZURE-APP-SERVICE.md](AZURE-APP-SERVICE.md).
 
 ## Prerequisites
 
 - .NET 10 runtime for the framework-dependent publish output.
-- A persistent database location. The current application uses SQLite.
+- A persistent database. SQLite is for local Development; non-Development environments require SQL Server.
 - Persistent private storage for learner recordings.
 - Persistent private storage for Data Protection keys.
 - HTTPS at the public origin.
@@ -20,23 +20,23 @@ Do not enable `DevelopmentAdminSeed` in Production. If a first administrator is 
 
 ## Database preparation
 
-The provider is SQLite. It is suitable for a small single-writer deployment when the database file is on reliable persistent storage and the operational team accepts SQLite's concurrency and maintenance constraints. The provider is not changed by this deployment preparation.
+Production uses SQL Server (including Azure SQL). SQLite is retained for local development and tests. Azure SQL has a separate migration set; do not mount or otherwise place the SQLite database on Azure Files.
 
 The application does not apply EF Core migrations automatically outside Development. Use this sequence:
 
 1. Stop or isolate the current application version.
-2. Back up the SQLite database file and its sidecar files.
+2. Back up the target database and associated private files. Existing SQLite data is not copied by the Azure SQL initial migration.
 3. Supply the Production connection string and the required Production startup configuration.
-4. Apply migrations with the project's EF Core tool:
+4. Generate and review an idempotent provider-specific script, then apply it to staging and production using an authorized deployment identity:
 
 ```text
-dotnet ef database update --project src/LexiAssist.Web -- --environment Production
+dotnet ef migrations script --idempotent --project src/LexiAssist.Web --context LexiAssist.Web.Data.AzureSqlApplicationDbContext --output deployment-migrations.sql
 ```
 
 5. Start the published application.
 6. Verify `/health`, authentication, and the role smoke tests.
 
-When using a shell that does not inherit environment variables automatically, use its equivalent syntax. The migration command must point to the same persistent database file that the application will use.
+Do not grant schema-alteration permissions to the running application identity. See the Azure guide for the managed-identity connection and setup sequence.
 
 ## Persistent storage
 
@@ -44,14 +44,13 @@ Recommended logical layout:
 
 ```text
 <application-artifact>/                 published application files
-<persistent-root>/database/              lexiassist.db and SQLite sidecars
 <persistent-root>/learner-recordings/   private learner recordings
 <persistent-root>/data-protection/      ASP.NET Core Data Protection keys
-<application-artifact>/App_Data/ScreeningAudio/  production instructional audio
+<persistent-root>/screening-audio/      production instructional audio
 <host-managed-log-location>/            protected application logs
 ```
 
-The database, learner recordings, and Data Protection keys must survive application replacement. The learner-recording and Data Protection directories must be writable by the application process and must not be exposed as static web content. `App_Data/ScreeningAudio` is resolved through an authenticated controller route and must not contain personal recordings.
+The database, learner recordings, instructional audio, and Data Protection keys must survive application replacement. The private directories must be writable by the application process and must not be exposed as static web content. Instructional audio is served through an authenticated controller route and must not contain personal recordings.
 
 The development fixture `development-listening-blue-bird.wav` is not a clinical assessment asset. Exclude it from production content and supply separately approved instructional audio where required.
 

@@ -34,7 +34,8 @@ public sealed class ScreeningController(
     IScreeningReportGenerationService reportGenerationService,
     AppNotificationService appNotificationService,
     IOptions<LearnerAudioRecordingOptions> audioRecordingOptions,
-    IOptions<ScreeningScoringOptions> screeningScoringOptions) : Controller
+    IOptions<ScreeningScoringOptions> screeningScoringOptions,
+    IOptions<ScreeningAudioOptions> screeningAudioOptions) : Controller
 {
     private const string MemoryAndBroaderThinkingSkillsCategoryName = "Memory and Broader Thinking Skills";
     private static readonly JsonSerializerOptions MetadataJsonOptions = new(JsonSerializerDefaults.Web);
@@ -45,6 +46,7 @@ public sealed class ScreeningController(
     private readonly IDataProtector _readingFluencyTokenProtector =
         dataProtectionProvider.CreateProtector("LexiAssist.Screening.ReadingFluency.v1");
     private readonly ScreeningScoringOptions _screeningScoringOptions = screeningScoringOptions.Value;
+    private readonly string? _screeningAudioDirectory = screeningAudioOptions.Value.StorageDirectory;
 
     [HttpGet("")]
     public async Task<IActionResult> Index()
@@ -885,7 +887,7 @@ public sealed class ScreeningController(
         var attempt = await FindIncompleteAttemptAsync(userId, tracked: false);
         var question = attempt is null ? null : await GetNextQuestionAsync(attempt.Id, cancellationToken);
         if (question is null || question.Id != questionId || question.QuestionType != ScreeningQuestionType.ListeningResponse ||
-            !ScreeningAudioSource.TryResolve(question.AudioPath, webHostEnvironment.ContentRootPath, out var filePath, out var contentType))
+            !ScreeningAudioSource.TryResolve(question.AudioPath, webHostEnvironment.ContentRootPath, out var filePath, out var contentType, _screeningAudioDirectory))
         {
             return NotFound("The configured audio file is unavailable.");
         }
@@ -1234,7 +1236,7 @@ public sealed class ScreeningController(
             return "The configured audio source is not supported. Please contact your support person to check the audio file name.";
         }
 
-        if (!ScreeningAudioSource.TryResolve(question.AudioPath, webHostEnvironment.ContentRootPath, out _, out _))
+        if (!ScreeningAudioSource.TryResolve(question.AudioPath, webHostEnvironment.ContentRootPath, out _, out _, _screeningAudioDirectory))
         {
             return "The configured audio file is missing or unavailable. Your progress is saved; please contact your support person.";
         }

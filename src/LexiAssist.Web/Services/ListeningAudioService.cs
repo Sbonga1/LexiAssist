@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 
 namespace LexiAssist.Web.Services;
 
@@ -11,13 +12,21 @@ public sealed record ListeningAudioUploadResult(
     string? ErrorMessage = null);
 
 /// <summary>Validates and stores administrator authored listening stimuli outside wwwroot.</summary>
-public sealed class ListeningAudioService(IWebHostEnvironment environment, ILogger<ListeningAudioService> logger)
+public sealed class ListeningAudioService(
+    IWebHostEnvironment environment,
+    ILogger<ListeningAudioService> logger,
+    IOptions<ScreeningAudioOptions> options)
 {
     public const long MaxFileSizeBytes = 10 * 1024 * 1024;
     public const int MaxDurationSeconds = 120;
     private const string OwnedPrefix = "listening-";
 
-    private string StorageDirectory => Path.Combine(environment.ContentRootPath, "App_Data", "ScreeningAudio");
+    private readonly ScreeningAudioOptions _options = options.Value;
+    private string StorageDirectory => string.IsNullOrWhiteSpace(_options.StorageDirectory)
+        ? Path.Combine(environment.ContentRootPath, "App_Data", "ScreeningAudio")
+        : Path.IsPathRooted(_options.StorageDirectory)
+            ? Path.GetFullPath(_options.StorageDirectory)
+            : Path.GetFullPath(Path.Combine(environment.ContentRootPath, _options.StorageDirectory));
 
     public bool IsOwnedFile(string? fileName) =>
         ScreeningAudioSource.TryGetContentType(fileName, out var safeName, out _) &&
@@ -101,7 +110,7 @@ public sealed class ListeningAudioService(IWebHostEnvironment environment, ILogg
 
     public bool TryDeleteOwned(string? fileName)
     {
-        if (!IsOwnedFile(fileName) || !ScreeningAudioSource.TryResolve(fileName, environment.ContentRootPath, out var fullPath, out _))
+        if (!IsOwnedFile(fileName) || !ScreeningAudioSource.TryResolve(fileName, environment.ContentRootPath, out var fullPath, out _, _options.StorageDirectory))
         {
             return false;
         }

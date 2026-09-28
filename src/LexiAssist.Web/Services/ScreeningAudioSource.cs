@@ -46,7 +46,8 @@ public static class ScreeningAudioSource
         string? configuredFileName,
         string contentRootPath,
         out string fullPath,
-        out string contentType)
+        out string contentType,
+        string? configuredDirectory = null)
     {
         fullPath = string.Empty;
         contentType = string.Empty;
@@ -57,7 +58,11 @@ public static class ScreeningAudioSource
 
         try
         {
-            var mediaRoot = Path.GetFullPath(Path.Combine(contentRootPath, "App_Data", "ScreeningAudio"));
+            var mediaRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(configuredDirectory)
+                ? Path.Combine(contentRootPath, "App_Data", "ScreeningAudio")
+                : Path.IsPathRooted(configuredDirectory)
+                    ? configuredDirectory
+                    : Path.Combine(contentRootPath, configuredDirectory));
             var candidatePath = Path.GetFullPath(Path.Combine(mediaRoot, fileName));
             if (!IsWithinDirectory(mediaRoot, candidatePath))
             {

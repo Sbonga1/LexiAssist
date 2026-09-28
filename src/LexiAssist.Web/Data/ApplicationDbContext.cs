@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LexiAssist.Web.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+public class ApplicationDbContext(DbContextOptions options) : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<UserAccessibilityPreference> UserAccessibilityPreferences => Set<UserAccessibilityPreference>();
 

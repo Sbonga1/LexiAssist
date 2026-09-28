@@ -3,6 +3,7 @@ using LexiAssist.Web.Models.Audit;
 using LexiAssist.Web.Services.Interfaces;
 using LexiAssist.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,8 @@ namespace LexiAssist.Web.Controllers;
 public sealed class AccountController(
     SignInManager<ApplicationUser> signInManager,
     UserManager<ApplicationUser> userManager,
-    IAuditService auditService) : Controller
+    IAuditService auditService,
+    IWebHostEnvironment environment) : Controller
 {
     [AllowAnonymous]
     [HttpGet]
@@ -34,6 +36,12 @@ public sealed class AccountController(
             return RedirectToDashboard();
         }
 
+        if (!environment.IsDevelopment())
+        {
+            TempData["StatusMessage"] = "Learner self-registration is unavailable right now. Please contact your LexiAssist administrator to request an account.";
+            return RedirectToAction(nameof(Login));
+        }
+
         return View(new RegisterViewModel());
     }
 
@@ -42,6 +50,12 @@ public sealed class AccountController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Register(RegisterViewModel model)
     {
+        if (!environment.IsDevelopment())
+        {
+            TempData["StatusMessage"] = "Learner self-registration is unavailable right now. Please contact your LexiAssist administrator to request an account.";
+            return RedirectToAction(nameof(Login));
+        }
+
         if (!model.AcceptScreeningPrivacyNotice)
         {
             ModelState.AddModelError(

@@ -117,7 +117,23 @@ public sealed class AdminAssessmentBuilderController(
                     GetSafePreviewImagePath(question.ImagePath),
                     audioPreviewUrl,
                     metadata.MaxAudioReplays,
-                    metadata.Transcript);
+                    metadata.Transcript,
+                    question.QuestionType,
+                    question.CorrectAnswer,
+                    metadata.ResponseType,
+                    question.QuestionType switch
+                    {
+                        ScreeningQuestionType.TimedNaming => metadata.TimedNamingItems,
+                        ScreeningQuestionType.WorkingMemorySequence => metadata.WorkingMemorySequence,
+                        ScreeningQuestionType.TimedMatching => metadata.TimedMatchingItems,
+                        _ => null
+                    },
+                    metadata.TimedMatchingReferenceMapping,
+                    metadata.TimeLimitSeconds,
+                    metadata.MemoryDisplayDurationMilliseconds,
+                    metadata.ReferenceWordCount,
+                    metadata.TargetWordsPerMinute,
+                    metadata.PatternDifficultyLevel);
             }).ToList()
         });
     }
@@ -379,6 +395,27 @@ public sealed class AdminAssessmentBuilderController(
             return RedirectToAction(nameof(Index), new { testId });
         }
 
+        if (request.RequestId == Guid.Empty)
+        {
+            request.RequestId = Guid.NewGuid();
+        }
+
+        var priorRequest = await dbContext.AssessmentDrafts.AsNoTracking()
+            .SingleOrDefaultAsync(draft => draft.Id == request.RequestId, cancellationToken);
+        if (priorRequest is not null)
+        {
+            var priorContent = DeserializeDraftContent(priorRequest.ContentJson);
+            if (priorRequest.ScreeningTestId != testId || priorRequest.IsCsvImport || priorContent.GenerationRequestId != request.RequestId)
+            {
+                return Conflict("This generation request identifier is already in use. Reload the assessment builder and try again.");
+            }
+
+            TempData["StatusMessage"] = "These questions were already generated and are available in the builder. No duplicates were created.";
+            var existingCount = await dbContext.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId, cancellationToken);
+            var existingPage = Math.Max(1, (int)Math.Ceiling(existingCount / (double)QuestionPageSize));
+            return RedirectToAction(nameof(Index), new { testId, page = existingPage });
+        }
+
         try
         {
             var existingPrompts = await dbContext.ScreeningQuestions.AsNoTracking()
@@ -394,15 +431,57 @@ public sealed class AdminAssessmentBuilderController(
                 request.DifficultyMix,
                 existingPrompts), cancellationToken);
 
-            var draftId = await CreateDraftAsync(testId, false, request.DifficultyMix, draft.Select(question => new GeneratedAssessmentQuestionViewModel
+            if (draft.Count != request.QuestionCount)
+            {
+                TempData["ErrorMessage"] = "The AI returned an unexpected number of questions. Try generating them again.";
+                return RedirectToAction(nameof(Index), new { testId });
+            }
+
+            var generatedQuestions = draft.Select(ToGeneratedQuestion).ToList();
+            var validationErrors = generatedQuestions
+                .Select((question, index) => (Index: index, Errors: ValidateDraftQuestion(question)))
+                .Where(result => result.Errors.Count > 0)
+                .ToList();
+            if (validationErrors.Count > 0)
+            {
+                logger.LogWarning("AI returned {InvalidQuestionCount} invalid question drafts for assessment {AssessmentId}.", validationErrors.Count, testId);
+                TempData["ErrorMessage"] = "The AI returned one or more incomplete questions. Nothing was added; try generating them again.";
+                return RedirectToAction(nameof(Index), new { testId });
+            }
+
+            var nextOrder = await GetNextQuestionOrderAsync(testId, cancellationToken);
+            var additions = generatedQuestions
+                .Select((question, index) => ToScreeningQuestion(testId, question, nextOrder + index))
+                .ToList();
+            var generationReceipt = new AssessmentDraft
+            {
+                Id = request.RequestId,
+                ScreeningTestId = testId,
+                IsCsvImport = false,
+                ContentJson = SerializeDraftContent(new AssessmentDraftContent
                 {
-                    Prompt = question.Prompt,
-                    QuestionType = question.QuestionType,
-                    CorrectAnswer = question.CorrectAnswer,
-                    Choices = question.Choices.ToList(),
-                    AcceptedAnswers = question.AcceptedAnswers.ToList()
-                }).ToList(), cancellationToken);
-            return RedirectToAction(nameof(DraftReview), new { testId, draftId });
+                    Questions = generatedQuestions,
+                    AddedIndexes = Enumerable.Range(0, generatedQuestions.Count).ToHashSet(),
+                    GenerationRequestId = request.RequestId,
+                    DifficultyMix = NormalizeDifficultyMix(request.DifficultyMix)
+                })
+            };
+
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            dbContext.ScreeningQuestions.AddRange(additions);
+            dbContext.AssessmentDrafts.Add(generationReceipt);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            foreach (var question in additions)
+            {
+                await auditService.RecordAsync(AuditActions.ScreeningQuestionCreated, AuditEntityTypes.ScreeningQuestion, question.Id.ToString(), true,
+                    new { question.ScreeningTestId, QuestionType = question.QuestionType.ToString(), Source = "OpenAI generation" }, cancellationToken);
+            }
+            await transaction.CommitAsync(cancellationToken);
+
+            var totalQuestions = await dbContext.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId, cancellationToken);
+            var page = Math.Max(1, (int)Math.Ceiling(totalQuestions / (double)QuestionPageSize));
+            TempData["StatusMessage"] = $"Generated {additions.Count} question{(additions.Count == 1 ? string.Empty : "s")} in the builder as inactive. Review and edit them before activating the assessment questions.";
+            return RedirectToAction(nameof(Index), new { testId, page });
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -470,7 +549,23 @@ public sealed class AdminAssessmentBuilderController(
                 ? null
                 : Url.Action("AudioPreview", "AdminScreeningQuestions", new { testId, fileName = question.AudioPath }),
             question.MaxAudioReplays,
-            question.Transcript);
+            question.Transcript,
+            question.QuestionType,
+            question.CorrectAnswer,
+            question.ListeningResponseType,
+            question.QuestionType switch
+            {
+                ScreeningQuestionType.TimedNaming => ParseLines(question.TimedNamingItemsText),
+                ScreeningQuestionType.WorkingMemorySequence => ParseLines(question.WorkingMemorySequenceText),
+                ScreeningQuestionType.TimedMatching => ParseLines(question.TimedMatchingItemsText),
+                _ => null
+            },
+            ParseReferenceMapping(question.TimedMatchingReferenceMappingText),
+            question.TimeLimitSeconds,
+            question.MemoryDisplayDurationMilliseconds,
+            question.ReferenceWordCount,
+            question.TargetWordsPerMinute,
+            question.PatternDifficultyLevel);
         return View("Preview", new AssessmentPreviewViewModel
         {
             ScreeningTestId = testId,
@@ -1339,7 +1434,8 @@ public sealed class AdminAssessmentBuilderController(
             ImportErrors = importErrors ?? [],
             ImportMessage = importMessage,
             ResumableDraftId = remainingDraftCount > 0 ? resumableDraft?.Id : null,
-            ResumableDraftCount = remainingDraftCount
+            ResumableDraftCount = remainingDraftCount,
+            GenerationRequestId = Guid.NewGuid()
         };
     }
 
@@ -1378,6 +1474,34 @@ public sealed class AdminAssessmentBuilderController(
         typeof(ScreeningQuestionType).GetMember(type.ToString()).FirstOrDefault()?.GetCustomAttribute<DisplayAttribute>()?.GetName() ?? type.ToString();
 
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static List<string> ParseLines(string? value) => string.IsNullOrWhiteSpace(value)
+        ? []
+        : value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => line.Length > 0)
+            .ToList();
+
+    private static IReadOnlyDictionary<string, string> ParseReferenceMapping(string? value)
+    {
+        var mapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in ParseLines(value))
+        {
+            var separator = line.IndexOf('=');
+            if (separator <= 0 || separator == line.Length - 1)
+            {
+                continue;
+            }
+
+            var item = line[..separator].Trim();
+            var symbol = line[(separator + 1)..].Trim();
+            if (item.Length > 0 && symbol.Length > 0)
+            {
+                mapping[item] = symbol;
+            }
+        }
+
+        return mapping;
+    }
 
     private static string? GetSafePreviewImagePath(string? value)
     {
@@ -1678,6 +1802,7 @@ public sealed class AdminAssessmentBuilderController(
         public HashSet<int> AddedIndexes { get; set; } = [];
         public int ActiveQuestionIndex { get; set; }
         public string DifficultyMix { get; set; } = "Balanced";
+        public Guid? GenerationRequestId { get; set; }
     }
 
     private sealed record CsvValidationResult(List<ImportedQuestion> Questions, List<string> Errors);

@@ -9210,6 +9210,9 @@ html.js .landing-reveal.is-visible { opacity: 1; transform: translate(0, 0); }
 .question-authoring-field textarea.form-control { min-height:5.1rem; resize:vertical; }
 .question-authoring-field .form-text { margin-top:.2rem; color:#74859d; font-size:.68rem; line-height:1.42; }
 .question-authoring-field .text-danger { display:block; margin-top:.18rem; font-size:.7rem; }
+.question-authoring-image-preview { display:flex; align-items:center; gap:.55rem; margin-top:.55rem; color:#637893; font-size:.72rem; }
+.question-authoring-image-preview img { display:block; width:auto; max-width:min(100%,18rem); max-height:10rem; object-fit:contain; border:1px solid #dce5ef; border-radius:.45rem; background:#f8fafc; }
+img.question-authoring-image-preview { display:block; margin-top:.55rem; }
 .question-authoring-label-row { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
 .question-authoring-inline-help { color:#7789a1; font-size:.68rem; }
 .question-authoring-option-list { display:grid; gap:.36rem; }

@@ -1,40 +1,215 @@
 @model LexiAssist.Web.ViewModels.AssessmentBuilder.AssessmentPreviewQuestion
+@using LexiAssist.Web.Models.Screening
+@{
+    var index = (int)(ViewData["PreviewIndex"] ?? 0);
+    var interactive = (bool)(ViewData["InteractivePreview"] ?? false);
+    var id = $"candidate-preview-question-{index + 1}";
+    var prompt = Model.Prompt ?? string.Empty;
+    var target = Model.TargetText?.Trim();
+    var canHighlightTarget = !string.IsNullOrWhiteSpace(target) &&
+        (Model.QuestionType is ScreeningQuestionType.WordReading or ScreeningQuestionType.NonWordReading) &&
+        prompt.EndsWith(target, StringComparison.OrdinalIgnoreCase);
+    var responseType = Model.ResponseType?.Trim().ToLowerInvariant() ?? "multiple-choice";
+    var hasOptions = Model.QuestionType is ScreeningQuestionType.MultipleChoice or ScreeningQuestionType.PhonologicalChoice or ScreeningQuestionType.PatternReasoning ||
+        Model.QuestionType == ScreeningQuestionType.ListeningResponse && responseType == "multiple-choice";
+    var hasVoice = Model.QuestionType is ScreeningQuestionType.WordReading or ScreeningQuestionType.NonWordReading or ScreeningQuestionType.TimedNaming or ScreeningQuestionType.ReadingFluency ||
+        Model.AllowsAudioRecording || Model.QuestionType == ScreeningQuestionType.ListeningResponse && responseType == "audio-response";
+}
 
-<p class="assessment-candidate-question-type">@Model.QuestionTypeName</p>
-<h2>@Model.Prompt</h2>
-@if (!string.IsNullOrWhiteSpace(Model.PassageText))
-{
-    <p class="assessment-candidate-passage">@Model.PassageText</p>
-}
-@if (!string.IsNullOrWhiteSpace(Model.ImagePath))
-{
-    <img class="assessment-candidate-question-image" src="@Model.ImagePath" alt="Question image" loading="lazy" />
-}
-@if (!string.IsNullOrWhiteSpace(Model.AudioPath))
-{
-    <div class="assessment-candidate-audio-note" role="group" aria-label="Listening stimulus">
-        <strong>Listen to the audio stimulus</strong>
-        <audio controls preload="metadata" src="@Model.AudioPath"></audio>
-        @if (Model.MaxAudioReplays is int replayLimit)
-        {
-            <p>Replay limit: @replayLimit additional repl@(replayLimit == 1 ? "ay" : "ays").</p>
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.Transcript))
-        {
-            <details><summary>Show transcript</summary><p>@Model.Transcript</p></details>
-        }
-    </div>
-}
-@if (Model.Choices.Count > 0)
-{
-    <ul class="assessment-candidate-choice-list">
-        @foreach (var choice in Model.Choices)
-        {
-            <li>@choice</li>
-        }
-    </ul>
-}
-@if (Model.AllowsAudioRecording)
-{
-    <p class="assessment-candidate-preview-note">Learner audio recording is available when this question is taken. Recording is disabled in preview.</p>
-}
+<article class="assessment-preview-question-card" aria-labelledby="@id">
+    <header class="assessment-preview-question-heading">
+        <div>
+            <p class="assessment-candidate-question-type">@Model.QuestionTypeName</p>
+            <h2 id="@id" tabindex="-1">
+                @if (canHighlightTarget)
+                {
+                    @(prompt[..(prompt.Length - target!.Length)])<strong class="assessment-preview-target">@target</strong>
+                }
+                else
+                {
+                    @prompt
+                }
+            </h2>
+        </div>
+        <span class="assessment-preview-type-badge">@Model.QuestionTypeName</span>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.PassageText))
+    {
+        <section class="assessment-preview-passage" aria-label="@(Model.QuestionType == ScreeningQuestionType.ReadingFluency ? "Passage to read" : "Reading passage")">
+            @if (Model.QuestionType == ScreeningQuestionType.ReadingFluency)
+            {
+                <p class="assessment-preview-context-label">Passage to read</p>
+            }
+            <p>@Model.PassageText</p>
+            @if (Model.ReferenceWordCount is int wordCount)
+            {
+                <small>@wordCount words@(Model.TargetWordsPerMinute is int pace ? $" · target pace {pace} words per minute" : string.Empty)</small>
+            }
+        </section>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+    {
+        <img class="assessment-candidate-question-image" src="@Model.ImagePath" alt="Question image" loading="lazy" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.AudioPath))
+    {
+        <section class="assessment-preview-audio-stimulus" aria-label="Listening stimulus">
+            <strong>Listen to the audio stimulus</strong>
+            <audio controls preload="metadata" src="@Model.AudioPath">Your browser does not support audio playback.</audio>
+            @if (Model.MaxAudioReplays is int replayLimit)
+            {
+                <small>Replay limit: @replayLimit additional repl@(replayLimit == 1 ? "ay" : "ays").</small>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Transcript))
+            {
+                <details><summary>Show accessibility transcript</summary><p>@Model.Transcript</p></details>
+            }
+        </section>
+    }
+
+    @if (Model.QuestionType == ScreeningQuestionType.TimedNaming && Model.ActivityItems is { Count: > 0 } namingItems)
+    {
+        <section class="assessment-preview-activity" aria-label="Timed naming items">
+            <p class="assessment-preview-context-label">Name the items in order@(Model.TimeLimitSeconds is int seconds ? $" · {seconds} seconds" : string.Empty)</p>
+            <ol class="assessment-preview-item-grid">
+                @foreach (var item in namingItems)
+                {
+                    <li>@item</li>
+                }
+            </ol>
+        </section>
+    }
+
+    @if (Model.QuestionType == ScreeningQuestionType.WorkingMemorySequence && Model.ActivityItems is { Count: > 0 } sequence)
+    {
+        <section class="assessment-preview-activity" aria-label="Working memory sequence">
+            <p class="assessment-preview-context-label">Preview of the sequence shown to candidates</p>
+            <div class="assessment-preview-sequence" aria-label="Sequence items separated by dots">@string.Join(" · ", sequence)</div>
+            @if (Model.MemoryDisplayDurationMilliseconds is int duration)
+            {
+                <small>Candidate display duration: @((duration / 1000m).ToString("0.##")) seconds</small>
+            }
+        </section>
+    }
+
+    @if (Model.QuestionType == ScreeningQuestionType.TimedMatching && Model.ActivityItems is { Count: > 0 } matchingItems)
+    {
+        <section class="assessment-preview-activity" aria-label="Timed matching demonstration">
+            <p class="assessment-preview-context-label">Reference mapping@(Model.TimeLimitSeconds is int seconds ? $" · {seconds} seconds" : string.Empty)</p>
+            @if (Model.ReferenceMapping is { Count: > 0 } mapping)
+            {
+                <dl class="assessment-preview-mapping">
+                    @foreach (var pair in mapping)
+                    {
+                        <div><dt>@pair.Key</dt><dd>@pair.Value</dd></div>
+                    }
+                </dl>
+            }
+            <fieldset class="assessment-preview-interaction">
+                <legend>Try the match (preview only)</legend>
+                @for (var itemIndex = 0; itemIndex < matchingItems.Count; itemIndex++)
+                {
+                    var item = matchingItems[itemIndex];
+                    var controlId = $"{id}-match-{itemIndex + 1}";
+                    <label for="@controlId">@item</label>
+                    <select id="@controlId" aria-label="@($"Symbol for {item}")">
+                        <option value="">Choose a symbol</option>
+                        @foreach (var choice in Model.Choices)
+                        {
+                            <option value="@choice">@choice</option>
+                        }
+                    </select>
+                }
+            </fieldset>
+        </section>
+    }
+
+    @if (hasOptions && Model.Choices.Count > 0)
+    {
+        <fieldset class="assessment-preview-interaction assessment-preview-choice-options">
+            <legend>Choose one answer <span>(preview only)</span></legend>
+            @for (var optionIndex = 0; optionIndex < Model.Choices.Count; optionIndex++)
+            {
+                var choice = Model.Choices[optionIndex];
+                var choiceId = $"{id}-option-{optionIndex + 1}";
+                <div class="assessment-preview-radio-option">
+                    <input type="radio" name="preview-answer-@index" id="@choiceId" value="@choice" />
+                    <label for="@choiceId">@choice</label>
+                </div>
+            }
+        </fieldset>
+    }
+    else if (Model.QuestionType is ScreeningQuestionType.TextResponse or ScreeningQuestionType.Spelling or ScreeningQuestionType.ReadingPassage ||
+             Model.QuestionType == ScreeningQuestionType.ListeningResponse && responseType == "text-response" ||
+             Model.QuestionType == ScreeningQuestionType.WorkingMemorySequence)
+    {
+        <div class="assessment-preview-text-response">
+            <label for="preview-response-@index">@(Model.QuestionType == ScreeningQuestionType.Spelling ? "Type your spelling" : Model.QuestionType == ScreeningQuestionType.WorkingMemorySequence ? "Enter the sequence in order" : "Your response")</label>
+            @if (Model.QuestionType == ScreeningQuestionType.Spelling)
+            {
+                <input id="preview-response-@index" type="text" autocomplete="off" placeholder="Type your answer" />
+            }
+            else
+            {
+                <textarea id="preview-response-@index" rows="4" placeholder="Type a response"></textarea>
+            }
+        </div>
+    }
+
+    @if (Model.PatternDifficultyLevel is int difficulty && Model.QuestionType == ScreeningQuestionType.PatternReasoning)
+    {
+        <p class="assessment-preview-context-label">Activity level: @difficulty of 5</p>
+    }
+
+    @if (Model.TimeLimitSeconds is int timeLimit && Model.QuestionType == ScreeningQuestionType.TimedNaming)
+    {
+        <p class="assessment-preview-context-label">Activity time limit: @timeLimit seconds</p>
+    }
+
+    @if (hasVoice)
+    {
+        <div class="assessment-preview-voice" data-preview-voice hidden>
+            <div class="assessment-preview-voice-title">
+                <strong>Spoken response</strong>
+                <span class="assessment-preview-admin-tag">Admin preview only</span>
+            </div>
+            <div class="assessment-preview-waveform" data-preview-waveform aria-hidden="true">
+                @for (var bar = 0; bar < 32; bar++)
+                {
+                    <span></span>
+                }
+            </div>
+            <p class="assessment-preview-recording-prompt">Click the microphone to start a temporary recording</p>
+            <div class="assessment-preview-voice-actions">
+                <button type="button" class="assessment-builder-button assessment-builder-button-primary" data-preview-start aria-label="Start temporary microphone recording">● <span>Start recording</span></button>
+                <button type="button" class="assessment-builder-button" data-preview-stop disabled>Stop</button>
+                <button type="button" class="assessment-builder-button" data-preview-play disabled>▶ <span>Play back</span></button>
+                <button type="button" class="assessment-builder-button" data-preview-clear disabled>Clear</button>
+            </div>
+            <audio class="assessment-preview-playback" data-preview-audio controls hidden></audio>
+            <p class="assessment-preview-recording-status" data-preview-recording-status role="status" aria-live="polite">Ready to record. Audio remains on this device and is not saved.</p>
+            <p class="assessment-preview-recording-error" data-preview-recording-error role="alert" hidden></p>
+            <section class="assessment-preview-diagnostics" aria-label="Administrator speech diagnostics">
+                <div class="assessment-preview-admin-notice"><strong>ADMIN PREVIEW ONLY</strong><span>Speech diagnostics are shown here for testing. Candidates do not see transcription or NLP evaluation.</span></div>
+                <label for="preview-transcript-@index">Live transcription</label>
+                <textarea id="preview-transcript-@index" rows="2" placeholder="Your speech will appear here..." readonly aria-describedby="preview-transcript-note-@index"></textarea>
+                <p id="preview-transcript-note-@index" class="assessment-preview-provider-note">Transcription is unavailable because no speech-recognition provider is configured. No speech is sent to a service.</p>
+                <h3>NLP analysis (preview)</h3>
+                <div class="assessment-preview-analysis">
+                    <div><strong>Pronunciation</strong><span>Unavailable</span></div>
+                    <div><strong>Confidence</strong><span>Unavailable</span></div>
+                    <div><strong>Status</strong><span>Not configured</span></div>
+                </div>
+            </section>
+        </div>
+        <p class="assessment-preview-voice-list-note" data-preview-voice-list-note>Microphone preview is available in Pager view.</p>
+    }
+
+    @if (interactive && Model.QuestionType == ScreeningQuestionType.ReadingFluency)
+    {
+        <p class="assessment-preview-runtime-note">The learner activity provides its own timing controls. No timer or candidate response is started from this read-only preview.</p>
+    }
+</article>

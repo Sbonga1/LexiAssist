@@ -151,6 +151,37 @@
   const existingAudioPath = listening?.querySelector("[data-existing-audio-path]");
   if (listening && audioPath && !audioPath.value && existingAudioPath?.value) audioPath.value = existingAudioPath.value;
   if (listening && audioPath?.value) listening.dataset.currentAudioFile = audioPath.value;
+  const imageUpload = page.querySelector("[data-question-image-upload]");
+  const imageUploadStatus = page.querySelector("[data-question-image-upload-status]");
+  const imageLocalPreview = page.querySelector("[data-question-image-local-preview]");
+  const existingImagePreview = page.querySelector("[data-existing-question-image]");
+  let localImagePreviewUrl;
+  imageUpload?.addEventListener("change", () => {
+    const file = imageUpload.files?.[0];
+    imageUpload.setCustomValidity("");
+    if (localImagePreviewUrl) URL.revokeObjectURL(localImagePreviewUrl);
+    localImagePreviewUrl = undefined;
+    if (imageLocalPreview) { imageLocalPreview.hidden = true; imageLocalPreview.removeAttribute("src"); }
+    if (!file) {
+      if (imageUploadStatus) imageUploadStatus.textContent = "";
+      return;
+    }
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if (file.size > 5 * 1024 * 1024) {
+      imageUpload.setCustomValidity("Question images must be 5 MB or smaller.");
+      if (imageUploadStatus) imageUploadStatus.textContent = "This file is over 5 MB. Choose a smaller image.";
+      return;
+    }
+    if (!allowedTypes.includes(file.type)) {
+      imageUpload.setCustomValidity("Choose a PNG, JPEG, WebP, or GIF image.");
+      if (imageUploadStatus) imageUploadStatus.textContent = "Choose a PNG, JPEG, WebP, or GIF image.";
+      return;
+    }
+    localImagePreviewUrl = URL.createObjectURL(file);
+    if (imageLocalPreview) { imageLocalPreview.src = localImagePreviewUrl; imageLocalPreview.hidden = false; }
+    if (existingImagePreview) existingImagePreview.hidden = true;
+    if (imageUploadStatus) imageUploadStatus.textContent = `${file.name} is ready on this device (${(file.size / 1024).toFixed(0)} KB). It uploads when you save.`;
+  });
   const selectedSource = listening?.querySelector("[data-audio-source]:checked")?.value; if (selectedSource) { listening.querySelector("[data-audio-source]:checked")?.toggleAttribute("data-previous-checked", true); setPanel(selectedSource); }
   syncOptionValues(); setTypeButtons(selector.value); updateFieldGroups(selector.value); updateListeningResponse();
 })();

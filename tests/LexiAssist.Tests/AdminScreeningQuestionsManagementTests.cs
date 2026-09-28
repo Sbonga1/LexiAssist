@@ -4,10 +4,13 @@ using System.Text.RegularExpressions;
 using LexiAssist.Web.Data;
 using LexiAssist.Web.Models.Identity;
 using LexiAssist.Web.Models.Screening;
+using LexiAssist.Web.Services;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LexiAssist.Tests;
 
@@ -78,6 +81,9 @@ public sealed class AdminScreeningQuestionsManagementTests
         Assert.Contains("Candidate preview", createHtml);
         Assert.Contains("data-move-option-up", createHtml);
         Assert.Contains("data-move-option-down", createHtml);
+        Assert.Contains("Upload question image", createHtml);
+        Assert.Contains("accept=\"image/png,image/jpeg,image/webp,image/gif\"", createHtml);
+        Assert.DoesNotContain("Image upload is not available here", createHtml);
         Assert.DoesNotContain("True / False", createHtml);
 
         var token = ExtractAntiForgeryToken(createHtml);
@@ -93,8 +99,9 @@ public sealed class AdminScreeningQuestionsManagementTests
             Regex.Match(candidatePreviewHtml, @"System\.InvalidOperationException: ([^\r\n<]+)").Groups[1].Value);
         Assert.Contains("Read-only candidate preview", candidatePreviewHtml);
         Assert.Contains("Choose the matching word.", candidatePreviewHtml);
-        Assert.Contains("<li>cat</li>", candidatePreviewHtml);
-        Assert.Contains("<li>dog</li>", candidatePreviewHtml);
+        Assert.Contains("id=\"candidate-preview-question-1-option-1\"", candidatePreviewHtml);
+        Assert.Contains("<label for=\"candidate-preview-question-1-option-1\">cat</label>", candidatePreviewHtml);
+        Assert.Contains("<label for=\"candidate-preview-question-1-option-2\">dog</label>", candidatePreviewHtml);
         Assert.DoesNotContain("Correct answer", candidatePreviewHtml);
         using (var scope = factory.Services.CreateScope())
         {
@@ -201,6 +208,88 @@ public sealed class AdminScreeningQuestionsManagementTests
             Assert.Equal("answer", updated.CorrectAnswer);
             Assert.Null(updated.MetadataJson);
             Assert.False(updated.IsActive);
+        }
+    }
+
+    [Fact]
+    public async Task Question_authoring_uploads_supported_images_privately_and_rejects_invalid_image_bytes()
+    {
+        using var factory = new LexiAssistWebApplicationFactory();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var (adminEmail, adminPassword) = await factory.CreateUserAsync(ApplicationRoles.Administrator);
+        await SignInAsync(client, adminEmail, adminPassword);
+
+        var storageDirectory = Path.Combine(Path.GetTempPath(), $"lexiassist-question-images-{Guid.NewGuid():N}");
+        using (var scope = factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<IOptions<QuestionImagesOptions>>().Value.StorageDirectory = storageDirectory;
+        }
+
+        try
+        {
+            const int testId = 1;
+            var questionsUrl = $"/admin/screening-tests/{testId}/questions";
+            var createPage = await client.GetAsync($"{questionsUrl}/create");
+            var token = ExtractAntiForgeryToken(await createPage.Content.ReadAsStringAsync());
+            var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC");
+            using var uploadForm = BuildImageForm(token, "Which shape completes the pattern?", png, "pattern.png");
+            var createResult = await client.PostAsync($"{questionsUrl}/create", uploadForm);
+
+            Assert.Equal(HttpStatusCode.Redirect, createResult.StatusCode);
+            var questionId = int.Parse(Regex.Match(GetLocationPath(createResult), @"questions/(\d+)/edit").Groups[1].Value);
+            string imagePath;
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var question = await dbContext.ScreeningQuestions.SingleAsync(item => item.Id == questionId);
+                imagePath = Assert.IsType<string>(question.ImagePath);
+                Assert.StartsWith("/question-images/question-image-", imagePath);
+                Assert.True(File.Exists(Path.Combine(storageDirectory, Path.GetFileName(imagePath))));
+                var webRoot = Path.GetFullPath(factory.Services.GetRequiredService<IWebHostEnvironment>().WebRootPath!);
+                Assert.False(Path.GetFullPath(storageDirectory).StartsWith(
+                    Path.TrimEndingDirectorySeparator(webRoot) + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase));
+            }
+
+            var imageResponse = await client.GetAsync(imagePath);
+            Assert.Equal(HttpStatusCode.OK, imageResponse.StatusCode);
+            Assert.Equal("image/png", imageResponse.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(png, await imageResponse.Content.ReadAsByteArrayAsync());
+            Assert.Equal("nosniff", imageResponse.Headers.GetValues("X-Content-Type-Options").Single());
+
+            var (learnerEmail, learnerPassword) = await factory.CreateUserAsync(ApplicationRoles.Learner);
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var question = await dbContext.ScreeningQuestions.SingleAsync(item => item.Id == questionId);
+                question.IsActive = true;
+                var screeningTest = await dbContext.ScreeningTests.SingleAsync(item => item.Id == testId);
+                screeningTest.IsActive = true;
+                await dbContext.SaveChangesAsync();
+            }
+            using var learnerClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+            await SignInAsync(learnerClient, learnerEmail, learnerPassword);
+            var learnerImageResponse = await learnerClient.GetAsync(imagePath);
+            Assert.Equal(HttpStatusCode.OK, learnerImageResponse.StatusCode);
+            Assert.Equal(png, await learnerImageResponse.Content.ReadAsByteArrayAsync());
+
+            createPage = await client.GetAsync($"{questionsUrl}/create");
+            token = ExtractAntiForgeryToken(await createPage.Content.ReadAsStringAsync());
+            using var invalidUploadForm = BuildImageForm(token, "Which shape completes the pattern?", [0x01, 0x02, 0x03], "pattern.png");
+            var invalidResult = await client.PostAsync($"{questionsUrl}/create", invalidUploadForm);
+            var invalidHtml = await invalidResult.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, invalidResult.StatusCode);
+            Assert.Contains("does not match a supported image format", invalidHtml);
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                Assert.Equal(1, await dbContext.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId));
+            }
+            Assert.Single(Directory.GetFiles(storageDirectory));
+        }
+        finally
+        {
+            if (Directory.Exists(storageDirectory)) Directory.Delete(storageDirectory, recursive: true);
         }
     }
 
@@ -689,6 +778,22 @@ public sealed class AdminScreeningQuestionsManagementTests
 
     private static FormUrlEncodedContent BuildActionForm(string token) =>
         new(new Dictionary<string, string> { ["__RequestVerificationToken"] = token });
+
+    private static MultipartFormDataContent BuildImageForm(string token, string prompt, byte[] imageBytes, string fileName)
+    {
+        var form = new MultipartFormDataContent();
+        var values = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["QuestionType"] = ((int)ScreeningQuestionType.PatternReasoning).ToString(),
+            ["Prompt"] = prompt,
+            ["ChoiceOptionsText"] = "circle\nsquare",
+            ["CorrectAnswer"] = "circle"
+        };
+        foreach (var (key, value) in values) form.Add(new StringContent(value), key);
+        form.Add(new ByteArrayContent(imageBytes), "ImageFile", fileName);
+        return form;
+    }
 
     private static string ExtractAntiForgeryToken(string html)
     {

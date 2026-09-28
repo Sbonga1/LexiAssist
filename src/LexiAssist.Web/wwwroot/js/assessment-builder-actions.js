@@ -183,22 +183,20 @@
 
     const validateSelected = review => {
         const selected = allBoxes(review).filter(box => box.checked && !box.disabled);
+        let firstInvalid = null;
         for (const box of selected) {
             const editor = review.querySelector(`[data-draft-editor="${box.value}"]`);
             if (!editor) continue;
             const errors = validateQuestion(editor);
-            if (errors.length) {
-                showQuestionErrors(editor, errors);
-                const filter = review.querySelector('[data-type-filter]');
-                if (filter?.value !== 'all') { filter.value = 'all'; updateFilter(review); }
-                setActiveQuestion(review, box.value);
-                const errorBox = editor.querySelector('[data-question-errors]');
-                errorBox?.focus();
-                return false;
-            }
-            showQuestionErrors(editor, []);
+            showQuestionErrors(editor, errors);
+            if (errors.length && firstInvalid === null) firstInvalid = { box, editor };
         }
-        return true;
+        if (!firstInvalid) return true;
+        const filter = review.querySelector('[data-type-filter]');
+        if (filter?.value !== 'all') { filter.value = 'all'; updateFilter(review); }
+        setActiveQuestion(review, firstInvalid.box.value);
+        firstInvalid.editor.querySelector('[data-question-errors]')?.focus();
+        return false;
     };
     const showQuestionErrors = (editor, errors) => {
         const box = editor.querySelector('[data-question-errors]');
@@ -220,14 +218,16 @@
         form.dataset.pending = 'true';
         const button = review.querySelector('[data-save-draft]');
         if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
-        if (!silent) feedback(review, 'Saving all draft edits…');
+        if (!silent) {
+            const status = review.querySelector('[data-save-status]');
+            if (status) status.textContent = 'Saving draft changes…';
+        }
         try {
             const response = await fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: requestHeaders, body: new FormData(form) });
             const contentType = response.headers.get('content-type') || '';
             if (contentType.includes('application/json') && response.ok) {
                 const result = await response.json();
                 markSaved(review, result.version);
-                feedback(review, result.message || 'Draft changes saved.', 'success');
                 return true;
             }
             const body = await response.text();
@@ -329,6 +329,11 @@
         const navigatorOpen = window.matchMedia('(max-width: 650px)').matches;
         navigator?.classList.toggle('is-open', navigatorOpen);
         navigatorToggle?.setAttribute('aria-expanded', String(navigatorOpen));
+        review.querySelectorAll('[data-draft-editor]').forEach(editor => {
+            const prompt = editor.querySelector('[data-prompt-field]');
+            const count = editor.querySelector('[data-prompt-count]');
+            if (prompt && count) count.textContent = `${prompt.value.length}/${prompt.maxLength}`;
+        });
         const form = draftForm(review);
         if (form) {
             markSaved(review);
@@ -341,6 +346,9 @@
         }
         review.addEventListener('change', event => {
             if (event.target.matches('[data-type-filter]')) updateFilter(review);
+            const changedEditor = event.target.closest('[data-draft-editor]');
+            const changedErrors = changedEditor?.querySelector('[data-question-errors]');
+            if (changedEditor && changedErrors && !changedErrors.hidden) showQuestionErrors(changedEditor, validateQuestion(changedEditor));
             if (event.target.matches('[data-select-all]')) {
                 filteredRows(review).forEach(row => {
                     const box = row.querySelector('input[name="SelectedIndexes"]');
@@ -356,6 +364,10 @@
             const rowText = review.querySelector(`[data-draft-index="${editor.dataset.draftEditor}"] .draft-question-excerpt`);
             const prompt = editor.querySelector(`[name="Questions[${editor.dataset.draftEditor}].Prompt"]`);
             if (rowText && prompt) rowText.textContent = prompt.value.trim() || 'Untitled draft';
+            const promptCount = editor.querySelector('[data-prompt-count]');
+            if (prompt && promptCount) promptCount.textContent = `${prompt.value.length}/${prompt.maxLength}`;
+            const errors = editor.querySelector('[data-question-errors]');
+            if (errors && !errors.hidden) showQuestionErrors(editor, validateQuestion(editor));
         });
     };
 
@@ -396,9 +408,9 @@
             }
         }
         if (submitter) { submitter.disabled = true; submitter.setAttribute('aria-busy', 'true'); }
-        if (isGenerate && submitter) submitter.textContent = 'Generating drafts…';
+        if (isGenerate && submitter) submitter.textContent = 'Generating questions…';
         root.setAttribute('aria-busy', 'true');
-        feedback(root, isGenerate ? 'Generating question drafts. This may take a little while…' : isImport ? 'Checking this CSV on your device. Uploading only after size and type validation…' : isBank ? 'Searching the question bank…' : 'Saving…');
+        feedback(root, isGenerate ? 'Generating questions. This may take a little while…' : isImport ? 'Checking this CSV on your device. Uploading only after size and type validation…' : isBank ? 'Searching the question bank…' : 'Saving…');
         try {
             const options = { method: form.method.toUpperCase(), credentials: 'same-origin', headers: requestHeaders };
             let url = form.action;
@@ -420,7 +432,7 @@
             const response = await fetch(url, options);
             const body = await response.text();
             const returned = parseHtml(body);
-            if ((isGenerate || isImport) && response.ok && returned.querySelector(reviewSelector)) {
+            if (isImport && response.ok && returned.querySelector(reviewSelector)) {
                 window.location.assign(response.url);
                 return;
             }
@@ -503,11 +515,19 @@
             if (unsavedAction) {
                 const dialog = review.querySelector('[data-unsaved-dialog]');
                 const action = unsavedAction.dataset.unsavedAction;
-                if (action === 'cancel') { dialog.close(); return; }
                 const proceed = review._continueNavigation;
                 dialog.close();
-                if (action === 'discard') { review.dataset.dirty = 'false'; proceed?.(); }
-                else saveDraft(review).then(saved => { if (saved) proceed?.(); });
+                review.dataset.pendingNavigation = 'false';
+                review._continueNavigation = null;
+                if (action === 'cancel') return;
+                if (action === 'discard') {
+                    // beforeunload also compares the form to its saved snapshot. Move
+                    // that baseline to the explicitly discarded values so this
+                    // deliberate navigation is not blocked by the browser prompt.
+                    review.dataset.savedSnapshot = JSON.stringify(valueSnapshot(draftForm(review)));
+                    review.dataset.dirty = 'false';
+                    proceed?.();
+                } else saveDraft(review).then(saved => { if (saved) proceed?.(); });
                 return;
             }
             const discardAction = target.closest('[data-discard-action]');
@@ -532,7 +552,9 @@
             if (focus) {
                 const enabled = document.body.classList.toggle('is-workspace-focus');
                 focus.setAttribute('aria-pressed', String(enabled));
-                focus.textContent = enabled ? 'Exit focus mode' : 'Focus mode';
+                const label = focus.querySelector('[data-focus-label]');
+                if (label) label.textContent = enabled ? 'Exit focus mode' : 'Focus mode';
+                else focus.textContent = enabled ? 'Exit focus mode' : 'Focus mode';
                 return;
             }
             const panelControl = target.closest('[data-toggle-panel], [data-close-panel]');
@@ -562,11 +584,13 @@
             const choiceId = row.querySelector('[data-choice-id]');
             const correct = row.querySelector('[data-correct-choice]');
             const label = row.querySelector('label.visually-hidden');
+            const letter = row.querySelector('[data-option-letter]');
             const id = `question-${qIndex}-choice-${index}`;
             choice.name = `Questions[${qIndex}].Choices[${index}]`; choice.id = id;
             choiceId.name = `Questions[${qIndex}].ChoiceIds[${index}]`;
             correct.name = `Questions[${qIndex}].CorrectChoiceId`;
             correct.setAttribute('aria-label', `Mark option ${index + 1} as correct`);
+            if (letter) letter.textContent = String.fromCharCode(65 + index);
             label.htmlFor = id; label.textContent = `Answer option ${index + 1}`;
             row.querySelector('[data-move-choice="up"]').disabled = index === 0;
             row.querySelector('[data-move-choice="down"]').disabled = index === list.querySelectorAll('[data-choice-row]').length - 1;
@@ -578,7 +602,7 @@
         const row = document.createElement('div'); row.className = 'draft-option-row'; row.dataset.choiceRow = '';
         const qIndex = editor.dataset.draftEditor;
         const id = crypto.randomUUID().replaceAll('-', '');
-        row.innerHTML = `<input type="hidden" data-choice-id value="${id}"><input type="radio" data-correct-choice value="${id}"><label class="visually-hidden">Answer option</label><input data-choice-text maxlength="300"><button type="button" class="draft-option-action" data-move-choice="up">↑</button><button type="button" class="draft-option-action" data-move-choice="down">↓</button><button type="button" class="draft-option-action" data-remove-choice>Remove</button>`;
+        row.innerHTML = `<input type="hidden" data-choice-id value="${id}"><input type="radio" data-correct-choice value="${id}"><span class="draft-option-letter" data-option-letter aria-hidden="true"></span><div class="draft-option-content"><label class="visually-hidden">Answer option</label><input data-choice-text maxlength="300"></div><button type="button" class="draft-option-action" data-move-choice="up" aria-label="Move option up">↑</button><button type="button" class="draft-option-action" data-move-choice="down" aria-label="Move option down">↓</button><button type="button" class="draft-option-action" data-remove-choice aria-label="Remove answer option">Remove</button>`;
         list.append(row); reindexOptions(list); row.querySelector('[data-choice-text]').focus();
     };
 

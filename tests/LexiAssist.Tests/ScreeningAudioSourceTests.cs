@@ -30,4 +30,32 @@ public sealed class ScreeningAudioSourceTests
             out _,
             out _));
     }
+
+    [Fact]
+    public void Configured_persistent_audio_directory_is_used_for_resolution()
+    {
+        var tempRoot = Path.GetFullPath(Path.GetTempPath());
+        var storageDirectory = Path.Combine(tempRoot, $"lexiassist-screening-audio-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(storageDirectory);
+        var fileName = "listening-test.wav";
+        var expectedPath = Path.Combine(storageDirectory, fileName);
+        File.WriteAllBytes(expectedPath, [1, 2, 3, 4]);
+
+        try
+        {
+            Assert.True(ScreeningAudioSource.TryResolve(
+                fileName,
+                Path.Combine(tempRoot, "application-content"),
+                out var actualPath,
+                out var contentType,
+                storageDirectory));
+            Assert.Equal(expectedPath, actualPath);
+            Assert.Equal("audio/wav", contentType);
+        }
+        finally
+        {
+            File.Delete(expectedPath);
+            Directory.Delete(storageDirectory);
+        }
+    }
 }

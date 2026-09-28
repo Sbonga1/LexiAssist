@@ -138,5 +138,25 @@
 
 <fieldset class="question-authoring-type-fields" data-question-types="1,5,6,13" hidden="@(!SupportsType("1,5,6,13"))" disabled="@(!SupportsType("1,5,6,13"))">
     <legend class="visually-hidden">Question image</legend>
-    <div class="question-authoring-field"><label asp-for="ImagePath" class="form-label"></label><input asp-for="ImagePath" class="form-control" placeholder="/images/question.png or https://..." /><div class="form-text">Enter an existing application path or URL. Image upload is not available here.</div><span asp-validation-for="ImagePath" class="text-danger small"></span></div>
+    <div class="question-authoring-field">
+        <label asp-for="ImagePath" class="form-label"></label>
+        <input asp-for="ImagePath" class="form-control" placeholder="/images/question.png or https://..." />
+        <div class="form-text">Keep using an existing application path or URL, or upload a PNG, JPEG, WebP, or GIF image. Uploaded images are stored privately and served only with an authenticated assessment session.</div>
+        <span asp-validation-for="ImagePath" class="text-danger small"></span>
+    </div>
+    <div class="question-authoring-field">
+        <label asp-for="ImageFile" class="form-label"></label>
+        <input asp-for="ImageFile" class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-question-image-upload aria-describedby="question-image-upload-help question-image-upload-status" />
+        <div id="question-image-upload-help" class="form-text">Maximum file size: 5 MB. The selected image replaces the path or URL when you save.</div>
+        <span asp-validation-for="ImageFile" class="text-danger small"></span>
+        <span id="question-image-upload-status" class="form-text" role="status" aria-live="polite" data-question-image-upload-status></span>
+        @if (ViewData["QuestionImagePreviewUrl"] is string imagePreviewUrl)
+        {
+            <div class="question-authoring-image-preview" data-existing-question-image>
+                <img src="@imagePreviewUrl" alt="Current question image" loading="lazy" />
+                <span>Current question image</span>
+            </div>
+        }
+        <img class="question-authoring-image-preview" alt="Selected question image preview" data-question-image-local-preview hidden />
+    </div>
 </fieldset>

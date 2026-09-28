@@ -3,19 +3,24 @@
     ViewData["Title"] = "Resume screening";
 }
 
-<section class="dashboard-page" aria-labelledby="resume-screening-heading">
-    <header class="dashboard-heading">
-        <p class="auth-eyebrow">Learner workspace</p>
-        <h1 id="resume-screening-heading">Resume screening</h1>
-        <p class="learner-dashboard-intro">Your in-progress screening was started @(Model.AttemptStartedAtUtc.ToString("u")).</p>
+<section class="dashboard-page learner-screening-runner" aria-labelledby="resume-screening-heading">
+    <header class="dashboard-heading learner-screening-heading">
+        <div>
+            <p class="auth-eyebrow">Assessment in progress</p>
+            <h1 id="resume-screening-heading">@(string.IsNullOrWhiteSpace(Model.ScreeningTestName) ? "Resume screening" : Model.ScreeningTestName)</h1>
+            @if (!Model.IsUnavailable)
+            {
+                <p class="learner-dashboard-intro">Question @Model.QuestionNumber of @Model.TotalQuestionCount <span aria-hidden="true">·</span> Your progress is saved as you continue.</p>
+            }
+            else
+            {
+                <p class="learner-dashboard-intro">Your in-progress screening was started @(Model.AttemptStartedAtUtc.ToString("u")).</p>
+            }
+        </div>
+        <a asp-action="Index" class="btn btn-outline-secondary learner-screening-exit">Pause and return later</a>
     </header>
 
     <partial name="_ScreeningNotice" />
-
-    @if (Model.AudioRecorder is { } audioRecorder)
-    {
-        <partial name="_LearnerAudioRecorder" model="audioRecorder" />
-    }
 
     @if (TempData["StatusMessage"] is string statusMessage)
     {
@@ -24,7 +29,7 @@
 
     @if (Model.IsUnavailable)
     {
-        <div class="learner-empty-state" role="status">
+        <div class="learner-empty-state learner-screening-unavailable" role="status">
             <h2 class="h4">Questions are not available right now</h2>
             <p class="mb-0">@(Model.UnavailableMessage ?? "Your saved screening is still here. Please try again later or contact your support person.")</p>
         </div>
@@ -32,19 +37,31 @@
     }
     else
     {
-        <section aria-labelledby="question-progress-heading" class="mb-4">
+        <section aria-labelledby="question-progress-heading" class="learner-screening-progress">
             <h2 id="question-progress-heading" class="visually-hidden">Screening progress</h2>
-            <p class="mb-2">Question @Model.QuestionNumber of @Model.TotalQuestionCount</p>
+            <div class="learner-screening-progress-heading">
+                <p>Question @Model.QuestionNumber of @Model.TotalQuestionCount</p>
+                <span>@Model.ProgressPercentage%</span>
+            </div>
             <div class="progress" role="progressbar" aria-label="Screening progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Model.ProgressPercentage">
                 <div class="progress-bar" style="width: @Model.ProgressPercentage%"></div>
             </div>
         </section>
 
-        <section class="admin-details-card screening-question" aria-labelledby="question-heading">
-            <p class="auth-eyebrow">@Model.ScreeningTestName</p>
+        <section class="admin-details-card screening-question learner-screening-question" aria-labelledby="question-heading">
+            <header class="learner-screening-question-meta">
+                <p class="auth-eyebrow">Question @Model.QuestionNumber</p>
+                @if (!string.IsNullOrWhiteSpace(Model.QuestionTypeName))
+                {
+                    <span class="learner-screening-type-badge">@Model.QuestionTypeName</span>
+                }
+            </header>
             @if (!string.IsNullOrWhiteSpace(Model.TestInstructions))
             {
-                <p class="text-secondary">@Model.TestInstructions</p>
+                <details class="learner-screening-instructions">
+                    <summary>Assessment instructions</summary>
+                    <p>@Model.TestInstructions</p>
+                </details>
             }
 
             @if (Model.Prompt is null)
@@ -57,31 +74,26 @@
             else if (Model.IsTimedNaming)
             {
                 <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                <p class="text-secondary">Rapid Automated Naming</p>
                 <partial name="_TimedNamingActivity" model="Model" />
             }
             else if (Model.IsWorkingMemorySequence)
             {
                 <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                <p class="text-secondary">Working memory sequence</p>
                 <partial name="_WorkingMemorySequenceActivity" model="Model" />
             }
             else if (Model.IsTimedMatching)
             {
                 <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                <p class="text-secondary">Timed matching</p>
                 <partial name="_TimedMatchingActivity" model="Model" />
             }
             else if (Model.IsPatternReasoning)
             {
                 <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                <p class="text-secondary">Broader thinking / Pattern reasoning</p>
                 <partial name="_PatternReasoningActivity" model="Model" />
             }
             else if (Model.IsReadingFluency)
             {
                 <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                <p class="text-secondary">Reading Fluency</p>
                 <partial name="_ReadingFluencyActivity" model="Model" />
             }
             else
@@ -94,14 +106,13 @@
                     @if (Model.IsReadingComprehension)
                     {
                         <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                        <p class="text-secondary">Reading comprehension question</p>
                         <div class="reading-fluency-passage mb-3" tabindex="0" aria-label="Passage for the comprehension question">@Model.PassageText</div>
                         <p class="text-secondary">Read the passage, then answer the question below.</p>
                     }
                     else if (Model.IsListeningComprehension)
                     {
                         <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                        <p class="text-secondary">Listen to the audio, then answer the question below.</p>
+                        <p class="learner-screening-guidance">Listen to the audio, then answer the question below.</p>
                         <partial name="_ListeningComprehensionPlayer" model="Model" />
                     }
                     else if (Model.QuestionType is LexiAssist.Web.Models.Screening.ScreeningQuestionType.WordReading or LexiAssist.Web.Models.Screening.ScreeningQuestionType.NonWordReading)
@@ -121,7 +132,6 @@
                     else
                     {
                         <h2 id="question-heading" class="h4">@Model.Prompt</h2>
-                        <p class="text-secondary">@Model.QuestionTypeName</p>
                     }
 
                     @if (Model.QuestionType is LexiAssist.Web.Models.Screening.ScreeningQuestionType.MultipleChoice or
@@ -173,6 +183,10 @@
                     <button type="submit" class="btn btn-primary" data-listening-answer-submit disabled="@(Model.IsListeningComprehension ? "disabled" : null)">Save and continue</button>
                 </form>
             }
+            @if (Model.AudioRecorder is { } audioRecorder)
+            {
+                <partial name="_LearnerAudioRecorder" model="audioRecorder" />
+            }
         </section>
     }
 </section>
@@ -200,4 +214,3 @@
         <script src="~/js/screening-listening-comprehension.js" asp-append-version="true"></script>
     }
 }
-

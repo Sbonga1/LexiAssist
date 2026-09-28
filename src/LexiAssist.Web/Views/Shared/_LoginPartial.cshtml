@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Identity
 @using LexiAssist.Web.Models.Identity
 @inject SignInManager<ApplicationUser> SignInManager
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebHostEnvironment
 @{
     var isHomePage = string.Equals(ViewContext.RouteData.Values["controller"]?.ToString(), "Home", StringComparison.OrdinalIgnoreCase)
         && string.Equals(ViewContext.RouteData.Values["action"]?.ToString(), "Index", StringComparison.OrdinalIgnoreCase);
@@ -96,9 +97,12 @@
 }
 else
 {
-    <li class="nav-item">
-        <a class="nav-link create-account-link" asp-controller="Account" asp-action="Register">Create account</a>
-    </li>
+    @if (WebHostEnvironment.IsDevelopment())
+    {
+        <li class="nav-item">
+            <a class="nav-link create-account-link" asp-controller="Account" asp-action="Register">Create account</a>
+        </li>
+    }
     <li class="nav-item">
         <a class="nav-link sign-in-link" asp-controller="Account" asp-action="Login">Sign in</a>
     </li>

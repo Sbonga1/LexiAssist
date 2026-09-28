@@ -66,8 +66,6 @@
     }
 
     <div class="alert alert-info" data-builder-feedback role="status" aria-live="polite" hidden></div>
-    <div id="assessment-generated-review-host" class="assessment-builder-generated-review-host" hidden></div>
-
     <div class="assessment-workspace-content">
     <div class="assessment-builder-title-row">
         <div>
@@ -198,12 +196,13 @@
         <aside class="assessment-builder-tools" aria-label="Question tools">
             <section id="assessment-ai" class="assessment-builder-tool-card" aria-labelledby="assessment-generate-heading" hidden>
                 <button type="button" class="assessment-builder-button workspace-close" data-close-panel="assessment-ai">Close AI panel</button>
-                <h2 id="assessment-generate-heading">Generate draft questions</h2>
-                <p>Generate original question drafts from this assessment’s purpose. Review every question before adding it.</p>
+                <h2 id="assessment-generate-heading">Generate questions</h2>
+                <p>Generate original questions from this assessment’s purpose. They appear in the question list as inactive so you can edit them before activation.</p>
                 @if (Model.OpenAiConfigured)
                 {
                     <form asp-action="Generate" asp-route-testId="@Model.ScreeningTestId" method="post" class="assessment-builder-ai-form">
                         @Html.AntiForgeryToken()
+                        <input type="hidden" name="RequestId" value="@Model.GenerationRequestId" />
                         <label for="QuestionCount">Question count</label>
                         <select id="QuestionCount" name="QuestionCount">
                             @for (var count = 1; count <= 20; count++)
@@ -218,7 +217,7 @@
                             <option>Progressive challenge</option>
                         </select>
                         <p class="assessment-builder-privacy-note">Submitting sends this assessment’s title, description, instructions, requested question count, selected difficulty mix, and existing question prompts to OpenAI. Do not include learner information in assessment details.</p>
-                        <button type="submit" class="assessment-builder-button assessment-builder-button-primary">✦ Generate draft questions</button>
+                        <button type="submit" class="assessment-builder-button assessment-builder-button-primary">✦ Generate questions</button>
                     </form>
                 }
                 else

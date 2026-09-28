@@ -9,7 +9,7 @@ LexiAssist is an ASP.NET Core MVC application for educational screening and lear
 - .NET 10 and ASP.NET Core 10
 - ASP.NET Core MVC with Razor Views
 - Entity Framework Core 10
-- SQLite for development
+- SQLite for development and tests; SQL Server (including Azure SQL) for non-Development deployments
 - ASP.NET Core Identity with Entity Framework Core
 - Bootstrap and vanilla JavaScript
 - xUnit and ASP.NET Core integration testing
@@ -39,7 +39,7 @@ dotnet build
 
 ## Database and migrations
 
-The development connection string is Data Source=lexiassist.db;Cache=Shared, configured as ConnectionStrings:DefaultConnection in src/LexiAssist.Web/appsettings.Development.json. Non-development environments must supply their own connection string through deployment configuration.
+The development connection string is Data Source=lexiassist.db;Cache=Shared, configured as ConnectionStrings:DefaultConnection in src/LexiAssist.Web/appsettings.Development.json. Non-development environments must set Database:Provider=SqlServer and supply a SQL Server connection string through deployment configuration. Azure deployment steps are in docs/deployment/AZURE-APP-SERVICE.md.
 
 Development startup applies pending migrations automatically and idempotently ensures the Learner, Administrator, and Psychologist roles. The migrations seed the screening categories and the five learning activity definitions. They do not create learner, psychologist, or administrator accounts, and they do not add copyrighted assessment questions.
 
@@ -49,6 +49,8 @@ For explicit migration management:
 dotnet ef migrations list --project src/LexiAssist.Web
 dotnet ef database update --project src/LexiAssist.Web
 ~~~
+
+For Azure SQL, select `LexiAssist.Web.Data.AzureSqlApplicationDbContext` and generate an idempotent SQL script for review before applying it. Production startup intentionally does not apply migrations.
 
 For deployment preparation, see [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md), the [production configuration example](docs/deployment/production-environment.example.md), and the [deployment checklist](docs/deployment/DEPLOYMENT-CHECKLIST.md).
 
@@ -227,7 +229,7 @@ The tests use isolated test databases and application factories rather than the 
 
 ## Production considerations
 
-- Use HTTPS and a production-grade database configuration rather than the development SQLite file where required by deployment scale.
+- Use HTTPS and the SQL Server provider for non-Development deployments; see [the Azure App Service guide](docs/deployment/AZURE-APP-SERVICE.md).
 - Apply migrations through an explicit deployment step. Automatic migration application is limited to the Development environment.
 - Persist and protect the Data Protection key ring across instances and deployments.
 - Store private recordings outside public static content, restrict access, set retention rules, and protect backups.

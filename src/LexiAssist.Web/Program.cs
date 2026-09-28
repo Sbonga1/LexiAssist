@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using LexiAssist.Web.Data;
@@ -13,10 +14,13 @@ using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 var isDevelopment = builder.Environment.IsDevelopment();
+var databaseProvider = builder.Configuration["Database:Provider"] ?? (isDevelopment ? "Sqlite" : string.Empty);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var allowedHosts = builder.Configuration["AllowedHosts"];
 var dataProtectionKeyPath = builder.Configuration["DataProtection:KeyPath"];
 var learnerAudioStoragePath = builder.Configuration["LearnerAudioRecording:StorageDirectory"];
+var screeningAudioStoragePath = builder.Configuration["ScreeningAudio:StorageDirectory"];
+var questionImageStoragePath = builder.Configuration["QuestionImages:StorageDirectory"];
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
@@ -25,6 +29,11 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 if (!isDevelopment)
 {
+    if (!string.Equals(databaseProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Database:Provider must be SqlServer outside Development. SQLite files are not supported for Azure production hosting.");
+    }
+
     if (string.IsNullOrWhiteSpace(allowedHosts) || string.Equals(allowedHosts.Trim(), "*", StringComparison.Ordinal))
     {
         throw new InvalidOperationException("AllowedHosts must be configured to the deployed host name outside Development.");
@@ -39,6 +48,16 @@ if (!isDevelopment)
     {
         throw new InvalidOperationException("LearnerAudioRecording:StorageDirectory must be configured as an absolute persistent path outside Development.");
     }
+
+    if (string.IsNullOrWhiteSpace(screeningAudioStoragePath) || !Path.IsPathRooted(screeningAudioStoragePath))
+    {
+        throw new InvalidOperationException("ScreeningAudio:StorageDirectory must be configured as an absolute persistent path outside Development.");
+    }
+
+    if (string.IsNullOrWhiteSpace(questionImageStoragePath) || !Path.IsPathRooted(questionImageStoragePath))
+    {
+        throw new InvalidOperationException("QuestionImages:StorageDirectory must be configured as an absolute persistent path outside Development.");
+    }
 }
 
 // Keep operational logs on the hosting process' standard output. This avoids
@@ -46,9 +65,40 @@ if (!isDevelopment)
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
-// Add services to the container.
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
+// SQLite remains the local-development provider. Production uses an independent
+// Azure SQL migration set so provider-specific schema is never mixed.
+if (string.Equals(databaseProvider, "Sqlite", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(connectionString));
+}
+else if (string.Equals(databaseProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddDbContext<AzureSqlApplicationDbContext>(options =>
+        options.UseSqlServer(connectionString, sql =>
+        {
+            sql.EnableRetryOnFailure(maxRetryCount: 5);
+            sql.MigrationsHistoryTable("__EFMigrationsHistory_AzureSql");
+        }));
+    builder.Services.AddScoped<ApplicationDbContext>(services =>
+        services.GetRequiredService<AzureSqlApplicationDbContext>());
+}
+else
+{
+    throw new InvalidOperationException("Database:Provider must be either Sqlite or SqlServer.");
+}
+
+if (builder.Configuration.GetValue<bool>("AzureAppService:ForwardedHeaders"))
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
+        // App Service terminates TLS at its managed frontend and worker proxy
+        // addresses are dynamic. Enable this only for an App Service deployment.
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 // Keep development keys local to the application while requiring an explicit,
 // persistent absolute path for non-development deployments.
 var keyDirectory = isDevelopment
@@ -159,6 +209,9 @@ builder.Services.Configure<AdaptiveSupportOptions>(builder.Configuration.GetSect
 builder.Services.AddSingleton<AdaptiveSupportService>();
 builder.Services.AddSingleton<ISupportiveFeedbackService, SupportiveFeedbackService>();
 builder.Services.Configure<LearnerAudioRecordingOptions>(builder.Configuration.GetSection(LearnerAudioRecordingOptions.SectionName));
+builder.Services.Configure<ScreeningAudioOptions>(builder.Configuration.GetSection(ScreeningAudioOptions.SectionName));
+builder.Services.Configure<QuestionImagesOptions>(builder.Configuration.GetSection(QuestionImagesOptions.SectionName));
+builder.Services.AddScoped<QuestionImageStorageService>();
 builder.Services.AddScoped<ILearnerAudioRecordingService, LearnerAudioRecordingService>();
 builder.Services.AddScoped<ListeningAudioService>();
 builder.Services.AddHealthChecks()
@@ -167,6 +220,11 @@ builder.Services.AddSingleton<ScreeningErrorCategoryAnalyticsCalculator>();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+if (builder.Configuration.GetValue<bool>("AzureAppService:ForwardedHeaders"))
+{
+    app.UseForwardedHeaders();
+}
 
 await using (var scope = app.Services.CreateAsyncScope())
 {

@@ -432,6 +432,55 @@ public sealed class AdminAssessmentBuilderTests
     }
 
     [Fact]
+    public async Task Candidate_preview_renders_real_question_types_and_pager_controls_without_persisting_responses()
+    {
+        using var factory = new LexiAssistWebApplicationFactory();
+        var testId = await CreateAssessmentAsync(factory, "candidate-preview-pager-types");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.ScreeningQuestions.AddRange(
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 1, IsActive = true, Prompt = "Choose the right sound.", QuestionType = ScreeningQuestionType.MultipleChoice, CorrectAnswer = "m", MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { ChoiceOptions = ["m", "s"] }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 2, IsActive = true, Prompt = "Tell us what you think.", QuestionType = ScreeningQuestionType.TextResponse },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 3, IsActive = true, Prompt = "Read this word aloud: map", QuestionType = ScreeningQuestionType.WordReading, CorrectAnswer = "map", AllowsAudioRecording = true },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 4, IsActive = true, Prompt = "Read this made-up word aloud: mip", QuestionType = ScreeningQuestionType.NonWordReading, CorrectAnswer = "mip" },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 5, IsActive = true, Prompt = "Choose the word with the same first sound.", QuestionType = ScreeningQuestionType.PhonologicalChoice, MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { ChoiceOptions = ["sun", "map"] }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 6, IsActive = true, Prompt = "Name each picture.", QuestionType = ScreeningQuestionType.TimedNaming, ImagePath = "/images/naming.png", MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { TimedNamingItems = Enumerable.Range(1, 20).Select(number => $"Item {number}").ToList(), TimeLimitSeconds = 30 }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 7, IsActive = true, Prompt = "Spell the word.", QuestionType = ScreeningQuestionType.Spelling, CorrectAnswer = "nest" },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 8, IsActive = true, Prompt = "What happened in the passage?", QuestionType = ScreeningQuestionType.ReadingPassage, MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { PassageText = "A child planted a seed." }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 9, IsActive = true, Prompt = "Answer after listening.", QuestionType = ScreeningQuestionType.ListeningResponse, AllowsAudioRecording = true, MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { ResponseType = "audio-response", Transcript = "A source accessibility transcript." }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 10, IsActive = true, Prompt = "Read the passage aloud.", QuestionType = ScreeningQuestionType.ReadingFluency, MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { PassageText = "One two three four.", ReferenceWordCount = 4, TargetWordsPerMinute = 40 }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 11, IsActive = true, Prompt = "Remember this order.", QuestionType = ScreeningQuestionType.WorkingMemorySequence, MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { WorkingMemorySequence = ["A", "7"], MemoryDisplayDurationMilliseconds = 3000 }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 12, IsActive = true, Prompt = "Match each item to its symbol.", QuestionType = ScreeningQuestionType.TimedMatching, MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { ChoiceOptions = ["●", "▲"], TimedMatchingItems = ["one", "two"], TimedMatchingReferenceMapping = new Dictionary<string, string> { ["one"] = "●", ["two"] = "▲" }, TimeLimitSeconds = 60 }) },
+                new ScreeningQuestion { ScreeningTestId = testId, SortOrder = 13, IsActive = true, Prompt = "Complete the pattern.", QuestionType = ScreeningQuestionType.PatternReasoning, MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { ChoiceOptions = ["circle", "square"], PatternDifficultyLevel = 2 }) });
+            await db.SaveChangesAsync();
+        }
+
+        using var client = await CreateAdministratorClientAsync(factory);
+        var html = await client.GetStringAsync($"/admin/screening-tests/{testId}/builder/preview");
+
+        Assert.Contains("List view", html);
+        Assert.Contains("Pager view", html);
+        Assert.Contains("data-preview-question-count", html);
+        Assert.Contains("data-preview-progress", html);
+        Assert.Contains("data-preview-previous disabled", html);
+        Assert.Contains("data-preview-next", html);
+        Assert.Equal(13, Regex.Matches(html, "data-preview-question data-question-index=").Count);
+        Assert.Contains("Live transcription", html);
+        Assert.Contains("no speech-recognition provider is configured", html);
+        Assert.Contains("NLP analysis (preview)", html);
+        Assert.Contains("Read this word aloud: <strong class=\"assessment-preview-target\">map</strong>", html);
+        Assert.Contains("Enter the sequence in order", html);
+        Assert.Contains("Match each item to its symbol.", html);
+        Assert.DoesNotContain("Correct answer", html, StringComparison.OrdinalIgnoreCase);
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Empty(await verifyDb.ScreeningTestAttempts.Where(item => item.ScreeningTestId == testId).ToListAsync());
+        Assert.Empty(await verifyDb.ScreeningResponses.Where(item => item.ScreeningQuestion.ScreeningTestId == testId).ToListAsync());
+    }
+
+    [Fact]
     public async Task Assessment_activation_is_antiforgery_protected_and_requires_an_active_question()
     {
         using var factory = new LexiAssistWebApplicationFactory();
@@ -624,7 +673,7 @@ public sealed class AdminAssessmentBuilderTests
     }
 
     [Fact]
-    public async Task Generated_and_interpreted_questions_stay_unsaved_and_csv_content_is_preserved()
+    public async Task Ai_generated_questions_populate_the_builder_and_interpreted_csv_content_is_preserved()
     {
         var generator = new WorkspaceDraftGenerator();
         using var factory = new LexiAssistWebApplicationFactory
@@ -639,19 +688,54 @@ public sealed class AdminAssessmentBuilderTests
         var testId = await GetFirstTestIdAsync(factory);
         var page = await client.GetStringAsync($"/admin/screening-tests/{testId}/builder");
         var token = ExtractAntiForgeryToken(page);
+        var requestIdMatch = Regex.Match(page, "name=\\\"RequestId\\\" value=\\\"([^\\\"]+)\\\"");
+        Assert.True(requestIdMatch.Success, "The builder should issue an idempotency key for AI generation.");
+        var requestId = requestIdMatch.Groups[1].Value;
         using var generation = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["__RequestVerificationToken"] = token,
+            ["RequestId"] = requestId,
             ["QuestionCount"] = "1",
             ["DifficultyMix"] = "Progressive challenge"
         });
         var response = await client.PostAsync($"/admin/screening-tests/{testId}/builder/generate", generation);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         var html = await client.GetStringAsync(GetLocationPath(response));
-        Assert.Contains("Review generated questions", html);
-        Assert.Contains("data-draft-editor", html);
-        Assert.Contains("Text response", html);
+        Assert.Contains("Generated 1 question in the builder as inactive", html);
+        Assert.Contains("Read the word.", html);
+        Assert.DoesNotContain("Review generated questions", html);
         Assert.Equal("Progressive challenge", generator.LastGeneration?.DifficultyMix);
+        using (var generatedScope = factory.Services.CreateScope())
+        {
+            var generatedDb = generatedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var generatedQuestion = await generatedDb.ScreeningQuestions.SingleAsync(question => question.ScreeningTestId == testId);
+            Assert.Equal("Read the word.", generatedQuestion.Prompt);
+            Assert.Equal(ScreeningQuestionType.TextResponse, generatedQuestion.QuestionType);
+            Assert.False(generatedQuestion.IsActive);
+            var receipt = await generatedDb.AssessmentDrafts.SingleAsync(draft => draft.ScreeningTestId == testId);
+            using var receiptContent = JsonDocument.Parse(receipt.ContentJson);
+            Assert.Equal(requestId, receiptContent.RootElement.GetProperty("generationRequestId").GetString());
+            Assert.Equal(1, receiptContent.RootElement.GetProperty("addedIndexes").GetArrayLength());
+        }
+
+        using (var retry = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["RequestId"] = requestId,
+            ["QuestionCount"] = "1",
+            ["DifficultyMix"] = "Progressive challenge"
+        }))
+        {
+            var duplicate = await client.PostAsync($"/admin/screening-tests/{testId}/builder/generate", retry);
+            Assert.Equal(HttpStatusCode.Redirect, duplicate.StatusCode);
+            Assert.Contains("No duplicates were created", await client.GetStringAsync(GetLocationPath(duplicate)));
+        }
+        Assert.Equal(1, generator.GenerationCalls);
+        using (var verifyScope = factory.Services.CreateScope())
+        {
+            var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Equal(1, await verifyDb.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId));
+        }
 
         const string csv = "Question,Answer\r\n\"Keep this\r\nline break\",word\r\n";
         using var import = BuildCsvForm(token, csv);
@@ -661,7 +745,7 @@ public sealed class AdminAssessmentBuilderTests
         Assert.Equal(csv, generator.LastCsv);
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        Assert.Equal(0, await dbContext.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId));
+        Assert.Equal(1, await dbContext.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId));
         Assert.Equal(2, await dbContext.AssessmentDrafts.CountAsync(draft => draft.ScreeningTestId == testId));
     }
 
@@ -681,17 +765,12 @@ public sealed class AdminAssessmentBuilderTests
         var testId = await GetFirstTestIdAsync(factory);
         var builder = await client.GetStringAsync($"/admin/screening-tests/{testId}/builder");
         var token = ExtractAntiForgeryToken(builder);
-        using var generate = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["__RequestVerificationToken"] = token,
-            ["QuestionCount"] = "1",
-            ["DifficultyMix"] = "Balanced"
-        });
-        var generated = await client.PostAsync($"/admin/screening-tests/{testId}/builder/generate", generate);
+        using var import = BuildCsvForm(token, "Question,Answer\r\nRead this word,word\r\n");
+        var generated = await client.PostAsync($"/admin/screening-tests/{testId}/builder/import", import);
         Assert.Equal(HttpStatusCode.Redirect, generated.StatusCode);
         var draftUrl = GetLocationPath(generated);
         var reviewHtml = await client.GetStringAsync(draftUrl);
-        Assert.Contains("Review generated questions", reviewHtml);
+        Assert.Contains("Review imported questions", reviewHtml);
         Assert.Contains("These are review drafts. Only selected questions are added, and they remain inactive until an administrator activates them.", reviewHtml);
         token = ExtractAntiForgeryToken(reviewHtml);
         var draftMatch = Regex.Match(draftUrl, @"/drafts/([0-9a-f-]{36})", RegexOptions.IgnoreCase);
@@ -717,7 +796,7 @@ public sealed class AdminAssessmentBuilderTests
             ["Questions[0].CorrectAnswer"] = "word",
             ["Questions[0].ChoicesText"] = "",
             ["Questions[0].AcceptedAnswersText"] = "",
-            ["Questions[0].Weight"] = "1"
+            ["Questions[0].Weight"] = "2.5"
         });
         save.Headers.Add("X-Requested-With", "XMLHttpRequest");
         var saved = await client.PostAsync(route + "/save", save);
@@ -734,8 +813,12 @@ public sealed class AdminAssessmentBuilderTests
             Assert.Equal(0, await dbContext.ScreeningQuestions.CountAsync(question => question.ScreeningTestId == testId));
             var draft = await dbContext.AssessmentDrafts.SingleAsync(item => item.Id == draftId);
             Assert.Contains(editedPrompt, draft.ContentJson);
+            using var draftContent = JsonDocument.Parse(draft.ContentJson);
+            Assert.Equal(2.5, draftContent.RootElement.GetProperty("questions")[0].GetProperty("weight").GetDouble());
             Assert.Equal(1, draft.Version);
         }
+        var savedReview = await client.GetStringAsync(route);
+        Assert.Contains("id=\"question-weight-0\" name=\"Questions[0].Weight\" type=\"number\" min=\"0.1\" max=\"100\" step=\"0.1\" value=\"2.5\"", savedReview);
 
         async Task<HttpResponseMessage> AddAsync(string prompt, int version)
         {
@@ -811,13 +894,8 @@ public sealed class AdminAssessmentBuilderTests
         var testId = await GetFirstTestIdAsync(factory);
         var builderHtml = await client.GetStringAsync($"/admin/screening-tests/{testId}/builder");
         var token = ExtractAntiForgeryToken(builderHtml);
-        using var generate = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["__RequestVerificationToken"] = token,
-            ["QuestionCount"] = "1",
-            ["DifficultyMix"] = "Mostly accessible"
-        });
-        var generated = await client.PostAsync($"/admin/screening-tests/{testId}/builder/generate", generate);
+        using var import = BuildCsvForm(token, "Question,Answer\r\nRead the original word aloud,map\r\n");
+        var generated = await client.PostAsync($"/admin/screening-tests/{testId}/builder/import", import);
         Assert.Equal(HttpStatusCode.Redirect, generated.StatusCode);
         var draftUrl = GetLocationPath(generated);
         var match = Regex.Match(draftUrl, @"/drafts/([0-9a-f-]{36})", RegexOptions.IgnoreCase);
@@ -872,7 +950,7 @@ public sealed class AdminAssessmentBuilderTests
         var replacement = await verifyDb.AssessmentDrafts.SingleAsync(item => item.Id == draftId);
         Assert.Contains("Read the replacement word aloud: sun.", replacement.ContentJson);
         Assert.Equal(1, replacement.Version);
-        Assert.Equal(3, generator.GenerationCalls);
+        Assert.Equal(2, generator.GenerationCalls);
     }
 
     [Fact]
@@ -1182,10 +1260,12 @@ public sealed class AdminAssessmentBuilderTests
         public bool IsConfigured => true;
         public string? LastCsv { get; private set; }
         public AssessmentDraftGenerationInput? LastGeneration { get; private set; }
+        public int GenerationCalls { get; private set; }
         private static IReadOnlyList<AssessmentDraftQuestion> Drafts =>
             [new("Read the word.", ScreeningQuestionType.TextResponse, "word", [], [])];
         public Task<IReadOnlyList<AssessmentDraftQuestion>> GenerateAsync(AssessmentDraftGenerationInput input, CancellationToken cancellationToken = default)
         {
+            GenerationCalls++;
             LastGeneration = input;
             return Task.FromResult(Drafts);
         }
@@ -1206,21 +1286,22 @@ public sealed class AdminAssessmentBuilderTests
             CancellationToken cancellationToken = default)
         {
             GenerationCalls++;
-            if (GenerationCalls == 2)
+            if (GenerationCalls == 1)
             {
                 return Task.FromException<IReadOnlyList<AssessmentDraftQuestion>>(new HttpRequestException("The test provider failed."));
             }
 
-            var prompt = GenerationCalls == 1 ? "Read the original word aloud: map." : "Read the replacement word aloud: sun.";
-            var answer = GenerationCalls == 1 ? "map" : "sun";
-            IReadOnlyList<AssessmentDraftQuestion> drafts = [new(prompt, ScreeningQuestionType.WordReading, answer, [], [])];
+            IReadOnlyList<AssessmentDraftQuestion> drafts = [new("Read the replacement word aloud: sun.", ScreeningQuestionType.WordReading, "sun", [], [])];
             return Task.FromResult(drafts);
         }
 
         public Task<IReadOnlyList<AssessmentDraftQuestion>> InterpretCsvAsync(
             CsvQuestionInterpretationInput input,
-            CancellationToken cancellationToken = default) =>
-            Task.FromException<IReadOnlyList<AssessmentDraftQuestion>>(new NotSupportedException());
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<AssessmentDraftQuestion> drafts = [new("Read the original word aloud: map.", ScreeningQuestionType.WordReading, "map", [], [])];
+            return Task.FromResult(drafts);
+        }
     }
 
     private sealed class TimeoutAssessmentDraftGenerator : IAssessmentDraftGenerator

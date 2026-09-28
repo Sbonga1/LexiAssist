@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using LexiAssist.Web.Models.Screening;
+using Microsoft.AspNetCore.Http;
 
 namespace LexiAssist.Web.ViewModels.AdminScreeningTests;
 
@@ -113,6 +114,9 @@ public sealed class AdminScreeningQuestionFormViewModel
     [StringLength(1024)]
     [Display(Name = "Image path or URL")]
     public string? ImagePath { get; set; }
+
+    [Display(Name = "Upload question image")]
+    public IFormFile? ImageFile { get; set; }
 
     [Display(Name = "Permit learner audio recording for this question")]
     public bool AllowsAudioRecording { get; set; }

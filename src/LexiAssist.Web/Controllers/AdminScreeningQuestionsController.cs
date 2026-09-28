@@ -13,6 +13,7 @@ using LexiAssist.Web.ViewModels.AdminScreeningTests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LexiAssist.Web.Controllers;
 
@@ -22,8 +23,11 @@ public sealed class AdminScreeningQuestionsController(
     ApplicationDbContext dbContext,
     IAuditService auditService,
     IAssessmentDraftGenerator draftGenerator,
-    ListeningAudioService listeningAudioService) : Controller
+    ListeningAudioService listeningAudioService,
+    QuestionImageStorageService questionImageStorageService,
+    IOptions<ScreeningAudioOptions> screeningAudioOptions) : Controller
 {
+    private readonly string? _screeningAudioDirectory = screeningAudioOptions.Value.StorageDirectory;
     private static readonly JsonSerializerOptions MetadataJsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -69,6 +73,7 @@ public sealed class AdminScreeningQuestionsController(
         }
 
         SetTestContext(screeningTest, returnToBuilder, returnPage);
+        SetImagePreview(null);
         ViewData["QuestionMode"] = "create";
         return View("Authoring", new AdminScreeningQuestionFormViewModel
         {
@@ -79,6 +84,8 @@ public sealed class AdminScreeningQuestionsController(
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
+    [RequestSizeLimit(QuestionImageStorageService.MaxFileSizeBytes + 256 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = QuestionImageStorageService.MaxFileSizeBytes + 256 * 1024)]
     public async Task<IActionResult> Create(int testId, AdminScreeningQuestionFormViewModel model, bool returnToBuilder = false, int returnPage = 1, string? submitMode = null)
     {
         var screeningTest = await FindScreeningTestAsync(testId);
@@ -88,6 +95,7 @@ public sealed class AdminScreeningQuestionsController(
         }
 
         SetTestContext(screeningTest, returnToBuilder, returnPage);
+        SetImagePreview(model.ImagePath);
         ViewData["QuestionMode"] = "create";
         NormalizeChoiceOptions(model);
         if (string.Equals(submitMode, "preview", StringComparison.OrdinalIgnoreCase))
@@ -97,9 +105,27 @@ public sealed class AdminScreeningQuestionsController(
         }
 
         ValidateQuestionSpecificFields(model);
+        ValidateImageUpload(model);
         if (!ModelState.IsValid)
         {
             return View("Authoring", model);
+        }
+
+        string? uploadedImageFileName = null;
+        var imagePath = GetImagePath(model);
+        if (model.ImageFile is not null)
+        {
+            var upload = await questionImageStorageService.SaveAsync(model.ImageFile, HttpContext.RequestAborted);
+            if (!upload.Success)
+            {
+                ModelState.AddModelError(nameof(model.ImageFile), upload.ErrorMessage ?? "The image could not be uploaded.");
+                SetImagePreview(model.ImagePath);
+                return View("Authoring", model);
+            }
+
+            uploadedImageFileName = upload.FileName;
+            imagePath = $"/question-images/{upload.FileName}";
+            SetImagePreview(imagePath);
         }
 
         var question = new ScreeningQuestion
@@ -115,15 +141,23 @@ public sealed class AdminScreeningQuestionsController(
                 .MaxAsync(item => (int?)item.SortOrder) ?? 0) + 1,
             IsActive = false,
             AudioPath = GetAudioPath(model),
-            ImagePath = GetImagePath(model),
+            ImagePath = imagePath,
             MetadataJson = SerializeMetadata(model),
             AllowsAudioRecording = model.AllowsAudioRecording && SupportsLearnerRecording(model.QuestionType)
         };
 
         dbContext.ScreeningQuestions.Add(question);
-        await dbContext.SaveChangesAsync();
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            questionImageStorageService.TryDeleteOwned(uploadedImageFileName);
+            throw;
+        }
         await auditService.RecordAsync(AuditActions.ScreeningQuestionCreated, AuditEntityTypes.ScreeningQuestion, question.Id.ToString(), true,
-            new { question.ScreeningTestId, QuestionType = question.QuestionType.ToString() });
+            new { question.ScreeningTestId, QuestionType = question.QuestionType.ToString(), HasUploadedImage = uploadedImageFileName is not null });
         if (question.QuestionType == ScreeningQuestionType.ListeningResponse && !string.IsNullOrWhiteSpace(question.AudioPath))
         {
             await auditService.RecordAsync(
@@ -156,6 +190,7 @@ public sealed class AdminScreeningQuestionsController(
         }
 
         SetTestContext(question.ScreeningTest, returnToBuilder, returnPage);
+        SetImagePreview(question.ImagePath);
         ViewData["QuestionMode"] = "edit";
         ViewData["OriginalQuestionType"] = (int)question.QuestionType;
         ViewData["QuestionIsActive"] = question.IsActive;
@@ -215,7 +250,7 @@ public sealed class AdminScreeningQuestionsController(
             return NotFound();
         }
 
-        if (!ScreeningAudioSource.TryResolve(fileName, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out var path, out var contentType))
+        if (!ScreeningAudioSource.TryResolve(fileName, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out var path, out var contentType, _screeningAudioDirectory))
         {
             return NotFound();
         }
@@ -251,6 +286,8 @@ public sealed class AdminScreeningQuestionsController(
 
     [HttpPost("{questionId:int}/edit")]
     [ValidateAntiForgeryToken]
+    [RequestSizeLimit(QuestionImageStorageService.MaxFileSizeBytes + 256 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = QuestionImageStorageService.MaxFileSizeBytes + 256 * 1024)]
     public async Task<IActionResult> Edit(int testId, int questionId, AdminScreeningQuestionFormViewModel model, bool returnToBuilder = false, int returnPage = 1, string? submitMode = null)
     {
         if (questionId != model.Id)
@@ -265,6 +302,7 @@ public sealed class AdminScreeningQuestionsController(
         }
 
         SetTestContext(question.ScreeningTest, returnToBuilder, returnPage);
+        SetImagePreview(model.ImagePath);
         NormalizeChoiceOptions(model);
         if (string.Equals(submitMode, "preview", StringComparison.OrdinalIgnoreCase))
         {
@@ -278,25 +316,61 @@ public sealed class AdminScreeningQuestionsController(
             ModelState.AddModelError(nameof(model.QuestionType), "Changing question type clears settings stored for the current type. Select the new type again and confirm before saving.");
         }
         ValidateQuestionSpecificFields(model);
+        ValidateImageUpload(model);
         if (!ModelState.IsValid)
         {
             ViewData["QuestionMode"] = "edit";
             ViewData["OriginalQuestionType"] = (int)question.QuestionType;
             ViewData["QuestionIsActive"] = question.IsActive;
+            SetImagePreview(model.ImagePath);
             return View("Authoring", model);
         }
 
         var previousAudioPath = question.AudioPath;
+        var previousImagePath = question.ImagePath;
+        string? uploadedImageFileName = null;
+        var imagePath = GetImagePath(model);
+        if (model.ImageFile is not null)
+        {
+            var upload = await questionImageStorageService.SaveAsync(model.ImageFile, HttpContext.RequestAborted);
+            if (!upload.Success)
+            {
+                ModelState.AddModelError(nameof(model.ImageFile), upload.ErrorMessage ?? "The image could not be uploaded.");
+                ViewData["QuestionMode"] = "edit";
+                ViewData["OriginalQuestionType"] = (int)question.QuestionType;
+                ViewData["QuestionIsActive"] = question.IsActive;
+                SetImagePreview(model.ImagePath);
+                return View("Authoring", model);
+            }
+
+            uploadedImageFileName = upload.FileName;
+            imagePath = $"/question-images/{upload.FileName}";
+        }
+
         question.Prompt = model.Prompt.Trim();
         question.QuestionType = model.QuestionType;
         question.Weight = model.Weight;
         question.CorrectAnswer = NormalizeOptionalText(GetCorrectAnswer(model));
         question.AcceptedAnswersJson = SerializeAcceptedAnswers(model);
         question.AudioPath = GetAudioPath(model);
-        question.ImagePath = GetImagePath(model);
+        question.ImagePath = imagePath;
         question.MetadataJson = SerializeMetadata(model);
         question.AllowsAudioRecording = model.AllowsAudioRecording && SupportsLearnerRecording(model.QuestionType);
-        await dbContext.SaveChangesAsync();
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            questionImageStorageService.TryDeleteOwned(uploadedImageFileName);
+            throw;
+        }
+        if (!string.Equals(previousImagePath, question.ImagePath, StringComparison.Ordinal) &&
+            QuestionImageSource.TryGetStoredFileName(previousImagePath, out var previousImageFileName, out _) &&
+            !await dbContext.ScreeningQuestions.AnyAsync(item => item.Id != questionId && item.ImagePath == previousImagePath))
+        {
+            questionImageStorageService.TryDeleteOwned(previousImageFileName);
+        }
         if (question.QuestionType == ScreeningQuestionType.ListeningResponse &&
             !string.Equals(previousAudioPath, question.AudioPath, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(previousAudioPath))
@@ -365,7 +439,7 @@ public sealed class AdminScreeningQuestionsController(
         }
 
         if (question.QuestionType == ScreeningQuestionType.ListeningResponse &&
-            !ScreeningAudioSource.TryResolve(question.AudioPath, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out _, out _))
+            !ScreeningAudioSource.TryResolve(question.AudioPath, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out _, out _, _screeningAudioDirectory))
         {
             TempData["ErrorMessage"] = "A listening question must have a stored audio stimulus before it can be activated.";
             return RedirectAfterQuestionEdit(testId, returnToBuilder, returnPage);
@@ -575,7 +649,7 @@ public sealed class AdminScreeningQuestionsController(
             ModelState.AddModelError(nameof(model.AudioPath), "Use a supported audio file name such as story.mp3. Folder paths and URLs are not allowed.");
         }
         else if (model.QuestionType == ScreeningQuestionType.ListeningResponse && model.ListeningComposerEnabled &&
-                 !ScreeningAudioSource.TryResolve(model.AudioPath, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out _, out _))
+                 !ScreeningAudioSource.TryResolve(model.AudioPath, HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, out _, out _, _screeningAudioDirectory))
         {
             ModelState.AddModelError(nameof(model.AudioPath), "Record or upload an audio stimulus before saving this listening question.");
         }
@@ -604,6 +678,18 @@ public sealed class AdminScreeningQuestionsController(
             }
         }
     }
+
+    private void ValidateImageUpload(AdminScreeningQuestionFormViewModel model)
+    {
+        if (model.ImageFile is not null && model.QuestionType is not (
+            ScreeningQuestionType.MultipleChoice or ScreeningQuestionType.PhonologicalChoice or
+            ScreeningQuestionType.TimedNaming or ScreeningQuestionType.PatternReasoning))
+        {
+            ModelState.AddModelError(nameof(model.ImageFile), "Images can be added to multiple choice, phonological choice, timed naming, or pattern reasoning questions.");
+        }
+    }
+
+    private void SetImagePreview(string? value) => ViewData["QuestionImagePreviewUrl"] = GetSafePreviewImagePath(value);
 
     private static void NormalizeChoiceOptions(AdminScreeningQuestionFormViewModel model)
     {
@@ -674,7 +760,23 @@ public sealed class AdminScreeningQuestionsController(
             GetSafePreviewImagePath(model.ImagePath),
             audioPreviewUrl,
             model.MaxAudioReplays,
-            NormalizeOptionalText(model.Transcript));
+            NormalizeOptionalText(model.Transcript),
+            model.QuestionType,
+            GetCorrectAnswer(model),
+            NormalizeResponseType(model.ListeningResponseType),
+            model.QuestionType switch
+            {
+                ScreeningQuestionType.TimedNaming => ParseLines(model.TimedNamingItemsText),
+                ScreeningQuestionType.WorkingMemorySequence => ParseLines(model.WorkingMemorySequenceText),
+                ScreeningQuestionType.TimedMatching => ParseLines(model.TimedMatchingItemsText),
+                _ => null
+            },
+            model.QuestionType == ScreeningQuestionType.TimedMatching ? ParseReferenceMapping(model.TimedMatchingReferenceMappingText) : null,
+            model.TimeLimitSeconds,
+            model.MemoryDisplayDurationMilliseconds,
+            model.ReferenceWordCount,
+            model.TargetWordsPerMinute,
+            model.PatternDifficultyLevel);
 
         return View("~/Views/AdminAssessmentBuilder/Preview.cshtml", new AssessmentPreviewViewModel
         {

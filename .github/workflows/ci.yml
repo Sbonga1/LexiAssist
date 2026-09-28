@@ -1,0 +1,44 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore LexiAssist.sln
+
+      - name: Build Release
+        run: dotnet build LexiAssist.sln --configuration Release --no-restore --maxcpucount:1 -p:UseSharedCompilation=false
+
+      - name: Run tests
+        run: dotnet test tests/LexiAssist.Tests/LexiAssist.Tests.csproj --configuration Release --no-build --maxcpucount:1
+
+      - name: Publish framework-dependent artifact
+        run: dotnet publish src/LexiAssist.Web/LexiAssist.Web.csproj --configuration Release --no-build --output "$RUNNER_TEMP/lexiassist-publish"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lexiassist-web-${{ github.sha }}
+          path: ${{ runner.temp }}/lexiassist-publish
+          if-no-files-found: error
+          retention-days: 14

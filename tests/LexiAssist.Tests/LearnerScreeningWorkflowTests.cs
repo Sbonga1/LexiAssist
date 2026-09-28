@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using LexiAssist.Web.Data;
 using LexiAssist.Web.Models.Identity;
 using LexiAssist.Web.Models.Screening;
@@ -66,7 +67,10 @@ public sealed class LearnerScreeningWorkflowTests
         {
             ScreeningTestId = 1,
             Prompt = "Saved screening question",
-            QuestionType = ScreeningQuestionType.TextResponse,
+            QuestionType = ScreeningQuestionType.WordReading,
+            CorrectAnswer = "map",
+            AllowsAudioRecording = true,
+            MetadataJson = JsonSerializer.Serialize(new ScreeningQuestionMetadata { Transcript = "private diagnostic transcript marker" }),
             SortOrder = 1
         });
         var anotherLearnerCredentials = await factory.CreateUserAsync(ApplicationRoles.Learner);
@@ -127,7 +131,19 @@ public sealed class LearnerScreeningWorkflowTests
         var resumeHtml = await resumeResult.Content.ReadAsStringAsync();
         Assert.Contains("Saved screening question", resumeHtml);
         Assert.Contains("Question 1 of 1", resumeHtml);
+        Assert.Contains("Assessment in progress", resumeHtml);
+        Assert.Contains("class=\"learner-screening-type-badge\">Word reading</span>", resumeHtml);
+        Assert.Contains("100%", resumeHtml);
+        Assert.Contains("Pause and return later", resumeHtml);
         Assert.Contains("Word Reading", resumeHtml);
+        Assert.Contains("data-learner-audio-recorder", resumeHtml);
+        Assert.DoesNotContain("Live transcription", resumeHtml);
+        Assert.DoesNotContain("recognized speech", resumeHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("NLP analysis", resumeHtml);
+        Assert.DoesNotContain("Confidence", resumeHtml);
+        Assert.DoesNotContain("Pronunciation score", resumeHtml);
+        Assert.DoesNotContain("speech match", resumeHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("private diagnostic transcript marker", resumeHtml);
         Assert.DoesNotContain("Memory and Broader Thinking Skills", resumeHtml);
         using (var scope = factory.Services.CreateScope())
         {

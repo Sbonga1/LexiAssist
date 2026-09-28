@@ -1,4 +1,5 @@
 @model LexiAssist.Web.ViewModels.LoginViewModel
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebHostEnvironment
 @{
     ViewData["Title"] = "Sign in";
 }
@@ -73,7 +74,10 @@
                 </form>
 
                 <p class="auth-footnote">If you need help accessing your account, contact your LexiAssist administrator.</p>
-                <p class="auth-footnote mt-2">New to LexiAssist? <a asp-controller="Account" asp-action="Register">Create a learner account</a></p>
+                @if (WebHostEnvironment.IsDevelopment())
+                {
+                    <p class="auth-footnote mt-2">New to LexiAssist? <a asp-controller="Account" asp-action="Register">Create a learner account</a></p>
+                }
             </div>
         </div>
     </div>
@@ -82,4 +86,3 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }
-

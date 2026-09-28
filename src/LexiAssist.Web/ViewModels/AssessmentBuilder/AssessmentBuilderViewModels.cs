@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using LexiAssist.Web.ModelBinding;
 using LexiAssist.Web.Models.Screening;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LexiAssist.Web.ViewModels.AssessmentBuilder;
 
@@ -21,6 +23,7 @@ public sealed class AssessmentBuilderViewModel
     public IReadOnlyList<string> ImportErrors { get; init; } = [];
     public Guid? ResumableDraftId { get; init; }
     public int ResumableDraftCount { get; init; }
+    public Guid GenerationRequestId { get; init; }
 }
 
 public sealed record AssessmentBuilderQuestionItem(
@@ -67,7 +70,17 @@ public sealed record AssessmentPreviewQuestion(
     string? ImagePath = null,
     string? AudioPath = null,
     int? MaxAudioReplays = null,
-    string? Transcript = null);
+    string? Transcript = null,
+    ScreeningQuestionType QuestionType = ScreeningQuestionType.TextResponse,
+    string? TargetText = null,
+    string? ResponseType = null,
+    IReadOnlyList<string>? ActivityItems = null,
+    IReadOnlyDictionary<string, string>? ReferenceMapping = null,
+    int? TimeLimitSeconds = null,
+    int? MemoryDisplayDurationMilliseconds = null,
+    int? ReferenceWordCount = null,
+    int? TargetWordsPerMinute = null,
+    int? PatternDifficultyLevel = null);
 
 public sealed class AssessmentDraftReviewViewModel
 {
@@ -116,6 +129,7 @@ public sealed class GeneratedAssessmentQuestionViewModel
     public int? MaxAudioReplays { get; set; }
     public string? ImagePath { get; set; }
     public bool AllowsAudioRecording { get; set; }
+    [ModelBinder(BinderType = typeof(InvariantDoubleModelBinder))]
     public double Weight { get; set; } = 1.0;
 }
 
@@ -138,6 +152,8 @@ public sealed class SaveAssessmentDraftViewModel : AddGeneratedAssessmentQuestio
 
 public sealed class AssessmentDraftRequestViewModel
 {
+    public Guid RequestId { get; set; } = Guid.NewGuid();
+
     [Range(1, 20)]
     public int QuestionCount { get; set; } = 10;
 

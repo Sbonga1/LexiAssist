@@ -5,14 +5,17 @@ using LexiAssist.Web.Data;
 using LexiAssist.Web.Models.Screening;
 using LexiAssist.Web.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LexiAssist.Web.Services;
 
 public sealed class AssessmentReadinessService(
     ApplicationDbContext dbContext,
-    IWebHostEnvironment environment) : IAssessmentReadinessService
+    IWebHostEnvironment environment,
+    IOptions<ScreeningAudioOptions> screeningAudioOptions) : IAssessmentReadinessService
 {
     private static readonly JsonSerializerOptions MetadataOptions = new(JsonSerializerDefaults.Web);
+    private readonly string? _screeningAudioDirectory = screeningAudioOptions.Value.StorageDirectory;
 
     public async Task<AssessmentReadinessResult?> GetReadinessAsync(
         int screeningTestId,
@@ -260,7 +263,7 @@ public sealed class AssessmentReadinessService(
         {
             issues.Add("Listening stimulus is missing or uses an unsupported audio file name.");
         }
-        else if (!ScreeningAudioSource.TryResolve(question.AudioPath, environment.ContentRootPath, out _, out _))
+        else if (!ScreeningAudioSource.TryResolve(question.AudioPath, environment.ContentRootPath, out _, out _, _screeningAudioDirectory))
         {
             issues.Add("Listening stimulus file is missing or unavailable.");
         }

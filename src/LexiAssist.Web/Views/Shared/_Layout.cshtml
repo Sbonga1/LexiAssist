@@ -52,7 +52,7 @@
     {
         <link rel="stylesheet" href="~/css/learner-experience.css" asp-append-version="true" />
     }
-    @if (ViewData["AssessmentWorkspace"] is true)
+    @if (ViewData["AssessmentWorkspace"] is true || ViewData["AssessmentPreview"] is true)
     {
         <link rel="stylesheet" href="~/css/assessment-workspace.css" asp-append-version="true" />
     }
