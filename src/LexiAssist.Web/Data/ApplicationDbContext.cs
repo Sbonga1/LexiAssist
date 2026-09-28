@@ -103,7 +103,6 @@ public class ApplicationDbContext(DbContextOptions options) : IdentityDbContext<
             entity.Property(preference => preference.UserId)
                 .IsRequired();
             entity.Property(preference => preference.PreferredReminderTime)
-                .HasColumnType("TEXT")
                 .IsRequired();
             entity.HasIndex(preference => preference.UserId)
                 .IsUnique();

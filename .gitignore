@@ -481,13 +481,8 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# Local databases and SQLite sidecar files
+# Local databases
 **/*.db
-**/*.db-shm
-**/*.db-wal
-**/*.db-journal
-**/*.sqlite
-**/*.sqlite3
 
 # Local-only configuration and tool state
 appsettings.*.local.json

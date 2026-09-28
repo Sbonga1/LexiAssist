@@ -10,15 +10,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.12" PrivateAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Data/Migrations/AzureSql/AzureSqlInitial.Up.sql" LogicalName="LexiAssist.Web.Data.Migrations.AzureSql.AzureSqlInitial.Up.sql" />
-    <EmbeddedResource Include="Data/Migrations/AzureSql/AzureSqlInitial.Down.sql" LogicalName="LexiAssist.Web.Data.Migrations.AzureSql.AzureSqlInitial.Down.sql" />
   </ItemGroup>
 
 </Project>

@@ -11,7 +11,7 @@ namespace LexiAssist.Tests;
 public sealed class FoundationTests
 {
     [Fact]
-    public async Task Application_starts_with_required_roles_and_an_in_memory_database()
+    public async Task Application_starts_with_required_roles_and_a_sql_server_database()
     {
         using var factory = new LexiAssistWebApplicationFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -24,7 +24,7 @@ public sealed class FoundationTests
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var connectionString = dbContext.Database.GetConnectionString();
 
-        Assert.Contains("Mode=Memory", connectionString, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("LexiAssistTests_", connectionString, StringComparison.OrdinalIgnoreCase);
         Assert.True(await roleManager.RoleExistsAsync(ApplicationRoles.Learner));
         Assert.True(await roleManager.RoleExistsAsync(ApplicationRoles.Administrator));
         Assert.True(await roleManager.RoleExistsAsync(ApplicationRoles.Psychologist));
@@ -36,7 +36,7 @@ public sealed class FoundationTests
     {
         using var factory = new LexiAssistWebApplicationFactory();
 
-        // The host initializes this fresh SQLite database once. Running the same
+        // The host initializes this fresh SQL Server database once. Running the same
         // initialization service again must not duplicate roles or categories.
         using (var scope = factory.Services.CreateScope())
         {

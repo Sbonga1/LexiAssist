@@ -16,8 +16,6 @@
 
 # Binary assets should never be normalized as text.
 *.db binary
-*.sqlite binary
-*.sqlite3 binary
 *.png binary
 *.jpg binary
 *.jpeg binary

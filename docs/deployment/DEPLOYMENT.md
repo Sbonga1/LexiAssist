@@ -1,11 +1,11 @@
 # LexiAssist deployment guide
 
-This guide describes the hosting-platform-neutral requirements. For the Azure App Service and Azure SQL configuration, use [AZURE-APP-SERVICE.md](AZURE-APP-SERVICE.md).
+This guide prepares the accepted LexiAssist application for a hosting-platform-neutral deployment. It does not assume IIS, Nginx, Docker, Kubernetes, a cloud provider, or a particular operating system.
 
 ## Prerequisites
 
 - .NET 10 runtime for the framework-dependent publish output.
-- A persistent database. SQLite is for local Development; non-Development environments require SQL Server.
+- A persistent SQL Server database. Azure SQL uses the SQL Server provider.
 - Persistent private storage for learner recordings.
 - Persistent private storage for Data Protection keys.
 - HTTPS at the public origin.
@@ -14,29 +14,42 @@ This guide describes the hosting-platform-neutral requirements. For the Azure Ap
 
 ## Configuration
 
-Set the required values in [production-environment.example.md](production-environment.example.md) before starting the application. The application refuses non-development startup when the database connection string, `AllowedHosts`, Data Protection key path, or learner recording path is missing or unsafe.
+Set the required values in [production-environment.example.md](production-environment.example.md) before starting the application. Set `AllowedHosts` to `*` in App Service configuration to accept requests sent to any hostname. The application refuses non-development startup when the database connection string, `AllowedHosts`, Data Protection key path, or learner recording path is missing or unsafe.
 
 Do not enable `DevelopmentAdminSeed` in Production. If a first administrator is needed, use the explicitly enabled `ProductionAdminBootstrap` settings for one controlled startup, then disable the setting and remove the password from the hosting configuration.
 
 ## Database preparation
 
-Production uses SQL Server (including Azure SQL). SQLite is retained for local development and tests. Azure SQL has a separate migration set; do not mount or otherwise place the SQLite database on Azure Files.
+Configure the connection string under the exact name `DefaultConnection`. For Azure App Service, use the Connection strings section and select type `SQLAzure`. The SQL Server provider is used in every environment. For passwordless Azure SQL access, configure the App Service system-assigned managed identity and use `Authentication=Active Directory Managed Identity` in the connection string.
+
+Enable the App Service system-assigned identity, then create its Azure SQL database user as an Entra administrator:
+
+```sql
+CREATE USER [<app-service-name>] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [<app-service-name>];
+ALTER ROLE db_datawriter ADD MEMBER [<app-service-name>];
+ALTER ROLE db_ddladmin ADD MEMBER [<app-service-name>];
+```
+
+Replace the placeholder with the exact App Service name. The application reads only `ConnectionStrings:DefaultConnection`; the App Service connection string overrides the LocalDB value from `appsettings.Development.json` in Azure.
 
 The application does not apply EF Core migrations automatically outside Development. Use this sequence:
 
 1. Stop or isolate the current application version.
-2. Back up the target database and associated private files. Existing SQLite data is not copied by the Azure SQL initial migration.
+2. Back up the target Azure SQL database.
 3. Supply the Production connection string and the required Production startup configuration.
-4. Generate and review an idempotent provider-specific script, then apply it to staging and production using an authorized deployment identity:
+4. Apply migrations with the project's EF Core tool:
 
 ```text
-dotnet ef migrations script --idempotent --project src/LexiAssist.Web --context LexiAssist.Web.Data.AzureSqlApplicationDbContext --output deployment-migrations.sql
+dotnet ef database update --project src/LexiAssist.Web --startup-project src/LexiAssist.Web --context ApplicationDbContext -- --environment Production
 ```
+
+The baseline migration creates the SQL Server schema. Existing local development data is not copied.
 
 5. Start the published application.
 6. Verify `/health`, authentication, and the role smoke tests.
 
-Do not grant schema-alteration permissions to the running application identity. See the Azure guide for the managed-identity connection and setup sequence.
+When using a shell that does not inherit environment variables automatically, use its equivalent syntax. The migration command must point to the same persistent database file that the application will use.
 
 ## Persistent storage
 
@@ -44,13 +57,14 @@ Recommended logical layout:
 
 ```text
 <application-artifact>/                 published application files
+<persistent-root>/                       Azure SQL database (managed by Azure)
 <persistent-root>/learner-recordings/   private learner recordings
 <persistent-root>/data-protection/      ASP.NET Core Data Protection keys
-<persistent-root>/screening-audio/      production instructional audio
+<application-artifact>/App_Data/ScreeningAudio/  production instructional audio
 <host-managed-log-location>/            protected application logs
 ```
 
-The database, learner recordings, instructional audio, and Data Protection keys must survive application replacement. The private directories must be writable by the application process and must not be exposed as static web content. Instructional audio is served through an authenticated controller route and must not contain personal recordings.
+The database, learner recordings, and Data Protection keys must survive application replacement. The learner-recording and Data Protection directories must be writable by the application process and must not be exposed as static web content. `App_Data/ScreeningAudio` is resolved through an authenticated controller route and must not contain personal recordings.
 
 The development fixture `development-listening-blue-bird.wav` is not a clinical assessment asset. Exclude it from production content and supply separately approved instructional audio where required.
 

@@ -9,7 +9,7 @@ LexiAssist is an ASP.NET Core MVC application for educational screening and lear
 - .NET 10 and ASP.NET Core 10
 - ASP.NET Core MVC with Razor Views
 - Entity Framework Core 10
-- SQLite for development and tests; SQL Server (including Azure SQL) for non-Development deployments
+- SQL Server for development and production (Azure SQL is supported)
 - ASP.NET Core Identity with Entity Framework Core
 - Bootstrap and vanilla JavaScript
 - xUnit and ASP.NET Core integration testing
@@ -19,6 +19,7 @@ The application is intentionally a simple ASP.NET Core MVC monolith. It does not
 ## Prerequisites
 
 - .NET 10 SDK
+- SQL Server LocalDB or another SQL Server instance for development
 - PowerShell, Bash, or another shell
 - A browser with JavaScript enabled
 - The local dotnet-ef tool restored from dotnet-tools.json for migration commands
@@ -39,29 +40,20 @@ dotnet build
 
 ## Database and migrations
 
-The development connection string is Data Source=lexiassist.db;Cache=Shared, configured as ConnectionStrings:DefaultConnection in src/LexiAssist.Web/appsettings.Development.json. Non-development environments must set Database:Provider=SqlServer and supply a SQL Server connection string through deployment configuration. Azure deployment steps are in docs/deployment/AZURE-APP-SERVICE.md.
+The development connection string targets SQL Server LocalDB and is configured as ConnectionStrings:DefaultConnection in src/LexiAssist.Web/appsettings.Development.json. Non-development environments must supply a SQL Server connection string with the same name through deployment configuration. For Azure App Service, create a connection string named `DefaultConnection` with type `SQLAzure`.
 
 Development startup applies pending migrations automatically and idempotently ensures the Learner, Administrator, and Psychologist roles. The migrations seed the screening categories and the five learning activity definitions. They do not create learner, psychologist, or administrator accounts, and they do not add copyrighted assessment questions.
 
 For explicit migration management:
 
 ~~~powershell
-dotnet ef migrations list --project src/LexiAssist.Web
-dotnet ef database update --project src/LexiAssist.Web
+dotnet ef migrations list --project src/LexiAssist.Web --context ApplicationDbContext
+dotnet ef database update --project src/LexiAssist.Web --context ApplicationDbContext
 ~~~
-
-For Azure SQL, select `LexiAssist.Web.Data.AzureSqlApplicationDbContext` and generate an idempotent SQL script for review before applying it. Production startup intentionally does not apply migrations.
 
 For deployment preparation, see [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md), the [production configuration example](docs/deployment/production-environment.example.md), and the [deployment checklist](docs/deployment/DEPLOYMENT-CHECKLIST.md).
 
-To recreate the local development database, stop the application, remove the SQLite database and its sidecar files, then apply the migrations again:
-
-~~~powershell
-Remove-Item src/LexiAssist.Web/lexiassist.db* -Force -ErrorAction SilentlyContinue
-dotnet ef database update --project src/LexiAssist.Web
-~~~
-
-That removal is destructive to local development data. Migrations are intentionally kept as a sequence; they are not squashed.
+For a clean local database, change the database name in the LocalDB connection string or delete the local database with SQL Server tooling. The SQL Server baseline migration creates the current schema; future schema changes should be added as new migrations.
 
 ## Start in development
 
@@ -203,7 +195,7 @@ The shared layout applies these preferences after login. Forms use labels and va
 Non-secret development defaults and transparent scoring/activity configuration are in src/LexiAssist.Web/appsettings.json. Override settings with environment variables or a deployment configuration provider. For example:
 
 ~~~text
-ConnectionStrings__DefaultConnection=Data Source=lexiassist.db;Cache=Shared
+ConnectionStrings__DefaultConnection=Server=(localdb)\MSSQLLocalDB;Database=LexiAssist_Development;Trusted_Connection=True;TrustServerCertificate=True
 ~~~
 
 Assessment draft generation uses the OpenAI Responses API with `gpt-6-astra`. Set `OPENAI_API_KEY` in the application environment, or store it in local Development user-secrets from Package Manager Console:
@@ -225,11 +217,11 @@ dotnet build
 dotnet test
 ~~~
 
-The tests use isolated test databases and application factories rather than the developer's physical SQLite database. Coverage includes authentication, role authorization, registration, user management, screening attempts and responses, scoring, risk thresholds, report snapshots, referrals, activities and adaptive support, recording authorization, privacy boundaries, resources, alerts, audit logging, and error handling.
+The tests use isolated SQL Server test databases and application factories rather than the developer's local database. Set `LEXIASSIST_TEST_SQLSERVER` to use a specific SQL Server instance; LocalDB is the default. Coverage includes authentication, role authorization, registration, user management, screening attempts and responses, scoring, risk thresholds, report snapshots, referrals, activities and adaptive support, recording authorization, privacy boundaries, resources, alerts, audit logging, and error handling.
 
 ## Production considerations
 
-- Use HTTPS and the SQL Server provider for non-Development deployments; see [the Azure App Service guide](docs/deployment/AZURE-APP-SERVICE.md).
+- Use HTTPS and a production-grade SQL Server database configuration.
 - Apply migrations through an explicit deployment step. Automatic migration application is limited to the Development environment.
 - Persist and protect the Data Protection key ring across instances and deployments.
 - Store private recordings outside public static content, restrict access, set retention rules, and protect backups.
