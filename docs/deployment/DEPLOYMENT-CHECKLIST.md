@@ -10,7 +10,7 @@
 - [ ] Persistent Data Protection key directory configured.
 - [ ] Persistent private learner-recording directory configured.
 - [ ] Application process has the required directory permissions.
-- [ ] `AllowedHosts` contains the deployed host and is not `*`.
+- [ ] `AllowedHosts` is configured; use `*` to accept any host header.
 - [ ] Production instructional audio supplied separately from the development fixture.
 
 ## Deploy

@@ -20,14 +20,14 @@ var learnerAudioStoragePath = builder.Configuration["LearnerAudioRecording:Stora
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    throw new InvalidOperationException("ConnectionStrings:DefaultConnection must be configured.");
+    throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 }
 
 if (!isDevelopment)
 {
-    if (string.IsNullOrWhiteSpace(allowedHosts) || string.Equals(allowedHosts.Trim(), "*", StringComparison.Ordinal))
+    if (string.IsNullOrWhiteSpace(allowedHosts))
     {
-        throw new InvalidOperationException("AllowedHosts must be configured to the deployed host name outside Development.");
+        throw new InvalidOperationException("AllowedHosts must be configured outside Development.");
     }
 
     if (string.IsNullOrWhiteSpace(dataProtectionKeyPath) || !Path.IsPathRooted(dataProtectionKeyPath))
@@ -48,7 +48,7 @@ builder.Logging.AddConsole();
 
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
+    options.UseSqlServer(connectionString));
 // Keep development keys local to the application while requiring an explicit,
 // persistent absolute path for non-development deployments.
 var keyDirectory = isDevelopment

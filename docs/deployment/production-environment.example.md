@@ -6,8 +6,8 @@ Supply these values through the hosting platform's environment/configuration mec
 | --- | --- | --- | --- | --- | --- |
 | `ASPNETCORE_ENVIRONMENT` | Yes | No | Selects production behavior. | `Production` | None. |
 | `ASPNETCORE_URLS` | Hosting-dependent | No | Listening URL(s) for the published process. | `http://127.0.0.1:5105` | None; coordinate with the hosting/proxy layer. |
-| `ConnectionStrings__DefaultConnection` | Yes | No for the current SQLite provider | SQLite database connection string. | `Data Source=<persistent-db-path>/lexiassist.db;Cache=Shared` | The database file and SQLite sidecars must persist. |
-| `AllowedHosts` | Yes | No | Host names accepted by ASP.NET Core host filtering. Do not use `*` in production. | `lexiassist.example.org` | None. |
+| `ConnectionStrings__DefaultConnection` | Yes | No with managed identity | Azure SQL connection string. The name must be exactly `DefaultConnection`. | `Server=tcp:<server>.database.windows.net,1433;Database=<database>;Authentication=Active Directory Managed Identity;Encrypt=True;TrustServerCertificate=False` | SQL Server is hosted and backed up by Azure. |
+| `AllowedHosts` | Yes | No | Host names accepted by ASP.NET Core host filtering. `*` accepts every non-empty Host header. | `*` | Any hostname can reach the app. |
 | `DataProtection__KeyPath` | Yes | No, but the directory contains sensitive key material | Persistent absolute directory for ASP.NET Core Data Protection keys. | `<persistent-root>/data-protection` | The directory must persist across restarts and be private. |
 | `LearnerAudioRecording__StorageDirectory` | Yes | No, but the files are sensitive | Persistent absolute directory for learner recordings. | `<persistent-root>/learner-recordings` | The directory must persist, be writable by the app, and never be web-accessible. |
 | `ProductionAdminBootstrap__Enabled` | Optional; defaults to `false` | No | Enables one-time production administrator bootstrap. | `true` only for the controlled bootstrap start | Set back to `false` and remove the credential values after successful provisioning. |

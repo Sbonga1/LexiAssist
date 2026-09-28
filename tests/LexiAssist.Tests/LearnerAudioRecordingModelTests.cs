@@ -12,7 +12,7 @@ public sealed class LearnerAudioRecordingModelTests
     public void Migration_snapshot_matches_current_ef_model()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseSqlite("Data Source=:memory:")
+            .UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=LexiAssistModelDesign;Trusted_Connection=True;TrustServerCertificate=True")
             .Options;
         using var context = new ApplicationDbContext(options);
         var snapshot = context.GetService<IMigrationsAssembly>().ModelSnapshot!;

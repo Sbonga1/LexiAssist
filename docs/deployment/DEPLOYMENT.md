@@ -5,7 +5,7 @@ This guide prepares the accepted LexiAssist application for a hosting-platform-n
 ## Prerequisites
 
 - .NET 10 runtime for the framework-dependent publish output.
-- A persistent database location. The current application uses SQLite.
+- A persistent SQL Server database. Azure SQL uses the SQL Server provider.
 - Persistent private storage for learner recordings.
 - Persistent private storage for Data Protection keys.
 - HTTPS at the public origin.
@@ -14,24 +14,37 @@ This guide prepares the accepted LexiAssist application for a hosting-platform-n
 
 ## Configuration
 
-Set the required values in [production-environment.example.md](production-environment.example.md) before starting the application. The application refuses non-development startup when the database connection string, `AllowedHosts`, Data Protection key path, or learner recording path is missing or unsafe.
+Set the required values in [production-environment.example.md](production-environment.example.md) before starting the application. Set `AllowedHosts` to `*` in App Service configuration to accept requests sent to any hostname. The application refuses non-development startup when the database connection string, `AllowedHosts`, Data Protection key path, or learner recording path is missing or unsafe.
 
 Do not enable `DevelopmentAdminSeed` in Production. If a first administrator is needed, use the explicitly enabled `ProductionAdminBootstrap` settings for one controlled startup, then disable the setting and remove the password from the hosting configuration.
 
 ## Database preparation
 
-The provider is SQLite. It is suitable for a small single-writer deployment when the database file is on reliable persistent storage and the operational team accepts SQLite's concurrency and maintenance constraints. The provider is not changed by this deployment preparation.
+Configure the connection string under the exact name `DefaultConnection`. For Azure App Service, use the Connection strings section and select type `SQLAzure`. The SQL Server provider is used in every environment. For passwordless Azure SQL access, configure the App Service system-assigned managed identity and use `Authentication=Active Directory Managed Identity` in the connection string.
+
+Enable the App Service system-assigned identity, then create its Azure SQL database user as an Entra administrator:
+
+```sql
+CREATE USER [<app-service-name>] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [<app-service-name>];
+ALTER ROLE db_datawriter ADD MEMBER [<app-service-name>];
+ALTER ROLE db_ddladmin ADD MEMBER [<app-service-name>];
+```
+
+Replace the placeholder with the exact App Service name. The application reads only `ConnectionStrings:DefaultConnection`; the App Service connection string overrides the LocalDB value from `appsettings.Development.json` in Azure.
 
 The application does not apply EF Core migrations automatically outside Development. Use this sequence:
 
 1. Stop or isolate the current application version.
-2. Back up the SQLite database file and its sidecar files.
+2. Back up the target Azure SQL database.
 3. Supply the Production connection string and the required Production startup configuration.
 4. Apply migrations with the project's EF Core tool:
 
 ```text
-dotnet ef database update --project src/LexiAssist.Web -- --environment Production
+dotnet ef database update --project src/LexiAssist.Web --startup-project src/LexiAssist.Web --context ApplicationDbContext -- --environment Production
 ```
+
+The baseline migration creates the SQL Server schema. Existing local development data is not copied.
 
 5. Start the published application.
 6. Verify `/health`, authentication, and the role smoke tests.
@@ -44,7 +57,7 @@ Recommended logical layout:
 
 ```text
 <application-artifact>/                 published application files
-<persistent-root>/database/              lexiassist.db and SQLite sidecars
+<persistent-root>/                       Azure SQL database (managed by Azure)
 <persistent-root>/learner-recordings/   private learner recordings
 <persistent-root>/data-protection/      ASP.NET Core Data Protection keys
 <application-artifact>/App_Data/ScreeningAudio/  production instructional audio

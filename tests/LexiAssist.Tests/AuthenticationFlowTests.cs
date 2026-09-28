@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -144,16 +144,19 @@ public sealed class AuthenticationFlowTests
 
 internal sealed class LexiAssistWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly string _connectionString =
-        $"Data Source=LexiAssistTests_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
-    private readonly SqliteConnection _anchorConnection;
+    private readonly string _connectionString = CreateTestConnectionString();
 
     public Action<IServiceCollection>? ConfigureAdditionalServices { get; set; }
 
-    public LexiAssistWebApplicationFactory()
+    private static string CreateTestConnectionString()
     {
-        _anchorConnection = new SqliteConnection(_connectionString);
-        _anchorConnection.Open();
+        var connectionString = Environment.GetEnvironmentVariable("LEXIASSIST_TEST_SQLSERVER")
+            ?? "Server=(localdb)\\MSSQLLocalDB;Database=LexiAssistTests;Trusted_Connection=True;TrustServerCertificate=True";
+        var builder = new SqlConnectionStringBuilder(connectionString)
+        {
+            InitialCatalog = $"LexiAssistTests_{Guid.NewGuid():N}"
+        };
+        return builder.ConnectionString;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -170,7 +173,7 @@ internal sealed class LexiAssistWebApplicationFactory : WebApplicationFactory<Pr
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
             services.RemoveAll<ApplicationDbContext>();
-            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connectionString));
+            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(_connectionString));
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
             ConfigureAdditionalServices?.Invoke(services);
         });
@@ -202,10 +205,12 @@ internal sealed class LexiAssistWebApplicationFactory : WebApplicationFactory<Pr
 
     protected override void Dispose(bool disposing)
     {
-        base.Dispose(disposing);
         if (disposing)
         {
-            _anchorConnection.Dispose();
+            using var scope = Services.CreateScope();
+            scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.EnsureDeleted();
         }
+
+        base.Dispose(disposing);
     }
 }
